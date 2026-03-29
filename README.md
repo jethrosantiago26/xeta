@@ -1,31 +1,97 @@
 # XETA
 
-XETA is a D2C e-commerce platform for computer peripherals.
+<div align="center">
 
-The project is split into:
-- `frontend/`: React + Vite client with Clerk authentication.
-- `backend/`: Laravel API for products, cart, orders, profile, and admin operations.
+XETA
+
+**D2C e-commerce platform for computer peripherals (customer + admin).**
+
+[![Frontend](https://img.shields.io/badge/Frontend-React_%2B_Vite-61dafb?logo=react&logoColor=000000)](#tech-stack)
+[![Backend](https://img.shields.io/badge/Backend-Laravel_12-ff2d20?logo=laravel&logoColor=white)](#tech-stack)
+[![Auth](https://img.shields.io/badge/Auth-Clerk-6c47ff)](#tech-stack)
+[![Database](https://img.shields.io/badge/Database-MySQL-00758f?logo=mysql&logoColor=white)](#tech-stack)
+[![Payment](https://img.shields.io/badge/Payment-Cash_on_Delivery-16a34a)](#core-features)
+[![License](https://img.shields.io/badge/license-MIT-8b5cf6)](backend/composer.json)
+
+Catalog browsing · Cart and checkout · Role-based admin panel · Clerk auth · Theme support
+
+</div>
 
 ## Tech Stack
 
-- Frontend: React, Vite, React Router, Clerk, Axios
-- Backend: Laravel 12, Eloquent ORM, API Resources, Form Requests
-- Database: MySQL
-- Payments: Cash on Delivery
+### Frontend
+- React 19
+- Vite 8
+- React Router DOM 7
+- Clerk React
+- Axios
+- Leaflet + React Leaflet
+- ESLint 9
+
+### Backend
+- Laravel 12 (API-first)
+- PHP 8.2+
+- Eloquent ORM
+- Form Requests + API Resources
+- Firebase PHP JWT
+
+### Data and Infra
+- MySQL 8
+- Cash on Delivery payment flow
+- Local dev with npm + Composer
+
+## Directory Map
+
+```text
+Xeta/
+├─ README.md
+├─ CHANGELOG.md
+├─ backend/
+│  ├─ app/
+│  │  ├─ Http/
+│  │  │  ├─ Controllers/
+│  │  │  ├─ Middleware/
+│  │  │  ├─ Requests/
+│  │  │  └─ Resources/
+│  │  ├─ Models/
+│  │  └─ Services/
+│  ├─ bootstrap/
+│  ├─ config/
+│  ├─ database/
+│  │  ├─ factories/
+│  │  ├─ migrations/
+│  │  └─ seeders/
+│  ├─ routes/
+│  ├─ tests/
+│  ├─ composer.json
+│  └─ artisan
+└─ frontend/
+   ├─ public/
+   ├─ src/
+   │  ├─ assets/
+   │  ├─ components/
+   │  ├─ pages/
+   │  ├─ App.jsx
+   │  └─ main.jsx
+   ├─ package.json
+   └─ vite.config.js
+```
 
 ## Core Features
 
-- Customer catalog browsing and filtering
-- Cart and COD checkout flow
-- User profile and account settings
-- Role-based admin dashboard
-- Product and variant management for admins
+- Product browsing by category and filters
+- Cart management with quantity updates
+- Cash on Delivery checkout
+- Customer account and order history
+- Admin dashboard and product management
+- Variant and inventory-oriented product forms
+- Light and dark theme support
 
 ## Architecture Flowchart
 
 ```mermaid
 flowchart LR
-		A[Customer / Admin Browser] --> B[React + Vite Frontend]
+		A[Customer/Admin Browser] --> B[React + Vite Frontend]
 		B --> C[Clerk Authentication]
 		C --> B
 		B --> D[Laravel API /api/v1]
@@ -48,52 +114,112 @@ flowchart LR
 		end
 ```
 
-## Request Flow
+## Setup Guide
 
-1. User signs in via Clerk on the frontend.
-2. Frontend attaches Clerk token to API requests.
-3. Laravel middleware validates JWT and resolves/creates the user.
-4. Controllers delegate business logic to services.
-5. Responses are returned via API resources to the frontend UI.
+### 1) Prerequisites
 
-## Local Development
+- Node.js 18+
+- npm 9+
+- PHP 8.2+
+- Composer 2+
+- MySQL 8+
 
-### Backend
+### 2) Clone and enter project
 
-1. Go to `backend/`
-2. Install dependencies
-3. Configure `.env`
-4. Run migrations and seeders
-5. Start Laravel server
+```bash
+git clone https://github.com/jethrosantiago26/xeta.git
+cd Xeta
+```
 
-### Frontend
+### 3) Backend setup (Laravel API)
 
-1. Go to `frontend/`
-2. Install dependencies
-3. Configure Clerk and API env vars
-4. Start Vite dev server
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-## Environment Variables (high-level)
+Update your backend .env database and Clerk values before running migrations.
 
-### Frontend
+Required backend variables (minimum):
+- APP_URL
+- DB_CONNECTION, DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+- CLERK_SECRET_KEY
 
-- `VITE_CLERK_PUBLISHABLE_KEY`
-- `VITE_API_URL`
+### 4) Database migration and seeding
 
-### Backend
+Run initial migrations:
 
-- `CLERK_SECRET_KEY` / Clerk-related config
-- DB connection values
-- Standard Laravel app settings
+```bash
+php artisan migrate
+```
 
-## API Scope (Summary)
+Run all configured seeders:
+
+```bash
+php artisan db:seed
+```
+
+Run migrate + seed in one command:
+
+```bash
+php artisan migrate --seed
+```
+
+Reset database and reseed from scratch (useful during development):
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+Seed a specific seeder only (example):
+
+```bash
+php artisan db:seed --class=CategorySeeder
+```
+
+Current seeder entrypoint:
+- backend/database/seeders/DatabaseSeeder.php
+
+### 5) Start backend server
+
+```bash
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+### 6) Frontend setup (React + Vite)
+
+In a new terminal:
+
+```bash
+cd frontend
+npm install
+```
+
+Create frontend .env (or .env.local) and set:
+- VITE_CLERK_PUBLISHABLE_KEY
+- VITE_API_URL=http://127.0.0.1:8000/api/v1
+
+Start frontend dev server:
+
+```bash
+npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
+```
+
+### 7) Access app
+
+- Frontend: http://127.0.0.1:5173
+- Backend API: http://127.0.0.1:8000
+
+## API Scope Summary
 
 - Public: products, categories
 - Authenticated: cart, checkout, orders, profile
-- Admin: dashboard, products, variants, admin order operations
+- Admin: dashboard, products, variants, order operations
 
 ## Notes
 
-- Admin and customer experiences are role-scoped.
-- COD is the active payment strategy.
-- UI supports light and dark themes.
+- Clerk manages authentication in frontend.
+- Laravel verifies Clerk JWT and resolves/creates local users.
+- Admin and customer routes are role-protected.

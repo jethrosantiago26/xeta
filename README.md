@@ -10,7 +10,6 @@ XETA
 [![Backend](https://img.shields.io/badge/Backend-Laravel_12-ff2d20?logo=laravel&logoColor=white)](#tech-stack)
 [![Auth](https://img.shields.io/badge/Auth-Clerk-6c47ff)](#tech-stack)
 [![Database](https://img.shields.io/badge/Database-MySQL-00758f?logo=mysql&logoColor=white)](#tech-stack)
-[![Payment](https://img.shields.io/badge/Payment-Cash_on_Delivery-16a34a)](#core-features)
 [![License](https://img.shields.io/badge/license-MIT-8b5cf6)](backend/composer.json)
 
 Catalog browsing · Cart and checkout · Role-based admin panel · Clerk auth · Theme support

@@ -206,11 +206,6 @@ Start frontend dev server:
 npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
-### 7) Access app
-
-- Frontend: http://127.0.0.1:5173
-- Backend API: http://127.0.0.1:8000
-
 ## API Scope Summary
 
 - Public: products, categories

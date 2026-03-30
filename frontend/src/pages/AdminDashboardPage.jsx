@@ -3,41 +3,63 @@ import PageHeader from '../components/PageHeader.jsx'
 import { getAdminDashboard, readResource } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
 
+const REFRESH_INTERVAL_MS = 10000
+
 function AdminDashboardPage() {
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  async function loadDashboard({ background = false } = {}) {
+    if (!background) {
+      setLoading(true)
+      setError('')
+    }
+
+    try {
+      const response = await getAdminDashboard()
+      const payload = readResource(response)
+      setDashboard(payload)
+    } catch {
+      if (!background) {
+        setDashboard(null)
+        setError('Dashboard data could not be loaded. Please verify your admin session and API server.')
+      }
+    } finally {
+      if (!background) {
+        setLoading(false)
+      }
+    }
+  }
+
   useEffect(() => {
     let active = true
 
-    async function loadDashboard() {
-      setLoading(true)
-      setError('')
-
-      try {
-        const response = await getAdminDashboard()
-        const payload = readResource(response)
-
-        if (active) {
-          setDashboard(payload)
-        }
-      } catch {
-        if (active) {
-          setDashboard(null)
-          setError('Dashboard data could not be loaded. Please verify your admin session and API server.')
-        }
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
+    async function boot() {
+      if (!active) {
+        return
       }
+
+      await loadDashboard()
     }
 
-    loadDashboard()
+    function refreshVisibleData() {
+      if (document.hidden || !active) {
+        return
+      }
+
+      loadDashboard({ background: true })
+    }
+
+    boot()
+
+    const intervalId = window.setInterval(refreshVisibleData, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refreshVisibleData)
 
     return () => {
       active = false
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshVisibleData)
     }
   }, [])
 

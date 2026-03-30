@@ -18,6 +18,8 @@ class ProductVariantResource extends JsonResource
             'stock_quantity' => $this->stock_quantity,
             'condition' => $this->condition,
             'attributes' => $this->attributes,
+            'color_hex' => $this->attributes['color_hex'] ?? null,
+            'image_url' => $this->attributes['image_url'] ?? null,
             'is_active' => $this->is_active,
             'in_stock' => $this->isInStock(),
             'on_sale' => $this->isOnSale(),

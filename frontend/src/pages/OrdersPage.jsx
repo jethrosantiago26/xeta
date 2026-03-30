@@ -1,66 +1,86 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../components/PageHeader.jsx'
 import { useSession } from '../context/SessionContext.jsx'
 import { getOrders, readResource } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
 
+const REFRESH_INTERVAL_MS = 12000
+
 function OrdersPage() {
-  const { isLoaded, isSignedIn, loading: sessionLoading, refreshProfile } = useSession()
+  const { isLoaded, isSignedIn, loading: sessionLoading } = useSession()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
 
+  const loadOrders = useCallback(async ({ background = false } = {}) => {
+    if (!isLoaded || sessionLoading) {
+      return
+    }
+
+    if (!isSignedIn) {
+      setOrders([])
+      setLoading(false)
+      setError('')
+      return
+    }
+
+    if (!background) {
+      setLoading(true)
+      setError('')
+    }
+
+    try {
+      const response = await getOrders({ per_page: 10 })
+      const payload = readResource(response)
+      const records = Array.isArray(payload?.data)
+        ? payload.data
+        : (payload?.data?.data ?? [])
+
+      setOrders(records)
+    } catch (requestError) {
+      if (!background) {
+        setOrders([])
+        setError(requestError?.response?.data?.message || 'Orders could not be loaded right now. Please retry.')
+      }
+    } finally {
+      if (!background) {
+        setLoading(false)
+      }
+    }
+  }, [isLoaded, isSignedIn, sessionLoading])
+
   useEffect(() => {
     let active = true
 
-    async function loadOrders() {
-      if (!isLoaded || sessionLoading) {
+    async function boot() {
+      if (!active) {
         return
       }
 
-      if (!isSignedIn) {
-        if (active) {
-          setOrders([])
-          setLoading(false)
-          setError('')
-        }
-        return
-      }
-
-      setLoading(true)
-      setError('')
-
-      try {
-        await refreshProfile()
-        const response = await getOrders({ per_page: 10 })
-        const payload = readResource(response)
-        const records = Array.isArray(payload?.data)
-          ? payload.data
-          : (payload?.data?.data ?? [])
-
-        if (active) {
-          setOrders(records)
-        }
-      } catch (requestError) {
-        if (active) {
-          setOrders([])
-          setError(requestError?.response?.data?.message || 'Orders could not be loaded right now. Please retry.')
-        }
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
-      }
+      await loadOrders()
     }
 
-    loadOrders()
+    function refreshVisibleData() {
+      if (document.hidden || !active) {
+        return
+      }
+
+      loadOrders({ background: true })
+    }
+
+    boot()
+
+    const intervalId = window.setInterval(refreshVisibleData, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refreshVisibleData)
 
     return () => {
       active = false
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshVisibleData)
     }
-  }, [isLoaded, isSignedIn, sessionLoading, reloadKey])
+  }, [loadOrders, reloadKey])
 
   return (
     <div className="page-grid">

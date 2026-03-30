@@ -11,19 +11,30 @@ use App\Http\Resources\ProductVariantResource;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
+use App\Services\VariantVisualService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        private readonly VariantVisualService $variantVisualService,
+    ) {
+    }
+
     /**
      * List all products (including inactive).
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $products = Product::with(['category', 'variants', 'images'])
+        $products = Product::with([
+            'category',
+            'variants' => fn ($query) => $query->where('condition', 'new'),
+            'images',
+        ])
             ->orderByDesc('created_at')
             ->paginate($request->integer('per_page', 20));
 
@@ -100,8 +111,18 @@ class ProductController extends Controller
     public function storeVariant(StoreVariantRequest $request, int $product): JsonResponse
     {
         $productModel = Product::findOrFail($product);
+        $payload = $request->validated();
+        unset($payload['image']);
 
-        $variant = $productModel->variants()->create($request->validated());
+        if ($request->hasFile('image')) {
+            $payload['attributes'] = is_array($payload['attributes'] ?? null) ? $payload['attributes'] : [];
+            $payload['attributes']['image_url'] = $this->storeVariantImage($request->file('image'));
+        }
+
+        $payload['condition'] = 'new';
+        $payload['attributes'] = $this->variantVisualService->buildAttributes($productModel, $payload);
+
+        $variant = $productModel->variants()->create($payload);
 
         return response()->json([
             'message' => 'Variant created',
@@ -114,19 +135,36 @@ class ProductController extends Controller
      */
     public function updateVariant(Request $request, int $product, int $variant): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'sku' => ['sometimes', 'string', 'max:255', 'unique:product_variants,sku,' . $variant],
             'price' => ['sometimes', 'numeric', 'min:0'],
             'compare_at_price' => ['nullable', 'numeric', 'min:0'],
             'stock_quantity' => ['sometimes', 'integer', 'min:0'],
-            'condition' => ['sometimes', 'in:new,used'],
+            'condition' => ['sometimes', 'in:new'],
             'attributes' => ['nullable', 'array'],
+            'image' => ['nullable', 'image', 'max:5120'],
             'is_active' => ['boolean'],
         ]);
 
         $variantModel = ProductVariant::where('product_id', $product)->findOrFail($variant);
-        $variantModel->update($request->all());
+        $productModel = Product::findOrFail($product);
+
+        unset($validated['image']);
+
+        if ($request->hasFile('image')) {
+            $validated['attributes'] = is_array($validated['attributes'] ?? null) ? $validated['attributes'] : [];
+            $validated['attributes']['image_url'] = $this->storeVariantImage($request->file('image'));
+        }
+
+        $validated['attributes'] = $this->variantVisualService->buildAttributes(
+            $productModel,
+            $validated,
+            $variantModel,
+        );
+        $validated['condition'] = 'new';
+
+        $variantModel->update($validated);
 
         return response()->json([
             'message' => 'Variant updated',
@@ -142,5 +180,19 @@ class ProductController extends Controller
         ProductVariant::where('product_id', $product)->findOrFail($variant)->delete();
 
         return response()->json(['message' => 'Variant deleted']);
+    }
+
+    private function storeVariantImage(UploadedFile $image): string
+    {
+        $destination = public_path('uploads/variants');
+
+        if (!is_dir($destination)) {
+            mkdir($destination, 0755, true);
+        }
+
+        $filename = $image->hashName();
+        $image->move($destination, $filename);
+
+        return '/uploads/variants/' . $filename;
     }
 }

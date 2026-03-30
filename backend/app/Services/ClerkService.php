@@ -26,9 +26,25 @@ class ClerkService
      */
     private function verifyToken(string $token): object
     {
-        $jwks = $this->getJwks();
-        $keys = JWK::parseKeySet($jwks);
+        $previousLeeway = JWT::$leeway;
+        JWT::$leeway = (int) config('clerk.jwt_leeway', 60);
 
+        try {
+            try {
+                return $this->decodeWithJwks($token, $this->getJwks());
+            } catch (\Throwable $firstError) {
+                // Clerk can rotate signing keys; refresh JWKS once before failing.
+                Cache::forget('clerk_jwks');
+                return $this->decodeWithJwks($token, $this->getJwks());
+            }
+        } finally {
+            JWT::$leeway = $previousLeeway;
+        }
+    }
+
+    private function decodeWithJwks(string $token, array $jwks): object
+    {
+        $keys = JWK::parseKeySet($jwks);
         return JWT::decode($token, $keys);
     }
 

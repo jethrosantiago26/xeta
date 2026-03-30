@@ -83,7 +83,9 @@ Xeta/
 - Cart management with quantity updates
 - Cash on Delivery checkout
 - Customer account and order history
+- Customer support tickets with FAQ
 - Admin dashboard and product management
+- Admin support inbox for triage and resolution
 - Variant and inventory-oriented product forms
 - Light and dark theme support
 
@@ -146,6 +148,9 @@ Required backend variables (minimum):
 - APP_URL
 - DB_CONNECTION, DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
 - CLERK_SECRET_KEY
+- RESEND_API_KEY
+- RESEND_FROM_ADDRESS
+- RESEND_SUPPORT_INBOX
 
 ### 4) Database migration and seeding
 
@@ -215,11 +220,12 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ## API Scope Summary
 
 - Public: products, categories
-- Authenticated: cart, checkout, orders, profile
-- Admin: dashboard, products, variants, order operations
+- Authenticated: cart, checkout, orders, profile, support tickets
+- Admin: dashboard, products, variants, order operations, support inbox
 
 ## Notes
 
 - Clerk manages authentication in frontend.
 - Laravel verifies Clerk JWT and resolves/creates local users.
 - Admin and customer routes are role-protected.
+- Support emails are delivered via Resend using backend env variables.

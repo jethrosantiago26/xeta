@@ -20,6 +20,8 @@ return [
 
     'resend' => [
         'key' => env('RESEND_API_KEY'),
+        'from' => env('RESEND_FROM_ADDRESS', 'support@xeta.store'),
+        'support_inbox' => env('RESEND_SUPPORT_INBOX', 'support@xeta.store'),
     ],
 
     'ses' => [

@@ -1,25 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext.jsx'
 import { useTheme } from '../../context/ThemeContext.jsx'
 
 function AppLayout() {
-  const { profile } = useSession()
+  const { profile, loading, isSignedIn } = useSession()
   const isAdmin = profile?.role === 'admin'
   const { isDark, toggleTheme } = useTheme()
-  const navigate = useNavigate()
+  const [shopMenuOpen, setShopMenuOpen] = useState(false)
+  const [shopMenuPinned, setShopMenuPinned] = useState(false)
+  const shopMenuRef = useRef(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsPinned, setSettingsPinned] = useState(false)
   const settingsMenuRef = useRef(null)
 
   useEffect(() => {
     function handleDocumentClick(event) {
-      if (!settingsMenuRef.current) {
-        return
+      if (shopMenuRef.current && !shopMenuRef.current.contains(event.target)) {
+        setShopMenuOpen(false)
+        setShopMenuPinned(false)
       }
 
-      if (!settingsMenuRef.current.contains(event.target)) {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target)) {
         setSettingsOpen(false)
+        setSettingsPinned(false)
       }
     }
 
@@ -33,6 +38,7 @@ function AppLayout() {
   const adminCoreMenu = [
     { to: '/admin', label: 'Overview' },
     { to: '/admin/products', label: 'Products' },
+    { to: '/admin/support', label: 'Support' },
   ]
 
   const adminCommerceMenu = [
@@ -47,6 +53,35 @@ function AppLayout() {
     { to: '/account', label: 'Profile' },
     { to: '/settings', label: 'Settings' },
   ]
+
+  function closeShopMenu() {
+    setShopMenuOpen(false)
+    setShopMenuPinned(false)
+  }
+
+  function closeSettingsMenu() {
+    setSettingsOpen(false)
+    setSettingsPinned(false)
+  }
+
+  // Avoid flashing customer navigation while role is still being resolved.
+  if (isSignedIn && (loading || !profile)) {
+    return (
+      <div className="page-shell">
+        <header className="site-header">
+          <div className="header-row customer-header-row">
+            <NavLink className="brand" to="/">
+              <strong>XETA</strong>
+            </NavLink>
+          </div>
+        </header>
+
+        <main>
+          <Outlet />
+        </main>
+      </div>
+    )
+  }
 
   if (isAdmin) {
     return (
@@ -86,12 +121,7 @@ function AppLayout() {
                     )}
                   </button>
                 </div>
-                <UserButton afterSignOutUrl="/">
-                  <UserButton.MenuItems>
-                    <UserButton.Action label="Profile" onClick={() => navigate('/account')} />
-                    <UserButton.Action label="Settings" onClick={() => navigate('/settings')} />
-                  </UserButton.MenuItems>
-                </UserButton>
+                <UserButton afterSignOutUrl="/" />
               </SignedIn>
             </div>
           </div>
@@ -154,25 +184,65 @@ function AppLayout() {
           </NavLink>
 
           <nav className="nav-links">
-            <details className="nav-dropdown">
-              <summary>Shop</summary>
-              <div className="nav-dropdown-menu" role="menu" aria-label="Shop categories">
-                <NavLink to="/products" role="menuitem">
-                  All Products
-                </NavLink>
-                <NavLink to="/products?category=mice" role="menuitem">
-                  Mice
-                </NavLink>
-                <NavLink to="/products?category=keyboards" role="menuitem">
-                  Keyboards
-                </NavLink>
-                <NavLink to="/products?category=mousepads" role="menuitem">
-                  Mouse Pads
-                </NavLink>
-              </div>
-            </details>
+            <div
+              className={`nav-dropdown${shopMenuOpen ? ' open' : ''}`}
+              ref={shopMenuRef}
+              onMouseEnter={() => {
+                if (!shopMenuPinned) {
+                  setShopMenuOpen(true)
+                }
+              }}
+              onMouseLeave={() => {
+                if (!shopMenuPinned) {
+                  setShopMenuOpen(false)
+                }
+              }}
+            >
+              <button
+                type="button"
+                className="nav-dropdown-trigger"
+                aria-expanded={shopMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => {
+                  setShopMenuPinned((value) => {
+                    const nextPinned = !value
+                    setShopMenuOpen(nextPinned)
+
+                    if (nextPinned) {
+                      closeSettingsMenu()
+                    }
+
+                    return nextPinned
+                  })
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    closeShopMenu()
+                  }
+                }}
+              >
+                Shop
+              </button>
+
+              {shopMenuOpen ? (
+                <div className="nav-dropdown-menu" role="menu" aria-label="Shop categories">
+                  <NavLink to="/products" role="menuitem" onClick={closeShopMenu}>
+                    All Products
+                  </NavLink>
+                  <NavLink to="/products?category=mice" role="menuitem" onClick={closeShopMenu}>
+                    Mice
+                  </NavLink>
+                  <NavLink to="/products?category=keyboards" role="menuitem" onClick={closeShopMenu}>
+                    Keyboards
+                  </NavLink>
+                  <NavLink to="/products?category=mousepads" role="menuitem" onClick={closeShopMenu}>
+                    Mouse Pads
+                  </NavLink>
+                </div>
+              ) : null}
+            </div>
             <NavLink to="/orders">Orders</NavLink>
-            <a href="mailto:support@xeta.store">Support</a>
+            <NavLink to="/support">Support</NavLink>
           </nav>
 
           <div className="actions" style={{ gap: '8px' }}>
@@ -193,14 +263,43 @@ function AppLayout() {
                   </svg>
                 </NavLink>
 
-                <div className="settings-dropdown" ref={settingsMenuRef}>
+                <div
+                  className="settings-dropdown"
+                  ref={settingsMenuRef}
+                  onMouseEnter={() => {
+                    if (!settingsPinned) {
+                      setSettingsOpen(true)
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (!settingsPinned) {
+                      setSettingsOpen(false)
+                    }
+                  }}
+                >
                   <button
                     type="button"
                     className="icon-nav-button"
                     aria-label="Settings menu"
                     title="Settings"
                     aria-expanded={settingsOpen}
-                    onClick={() => setSettingsOpen((value) => !value)}
+                    onClick={() => {
+                      setSettingsPinned((value) => {
+                        const nextPinned = !value
+                        setSettingsOpen(nextPinned)
+
+                        if (nextPinned) {
+                          closeShopMenu()
+                        }
+
+                        return nextPinned
+                      })
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        closeSettingsMenu()
+                      }
+                    }}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                       <path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
@@ -210,10 +309,10 @@ function AppLayout() {
 
                   {settingsOpen ? (
                     <div className="settings-dropdown-menu" role="menu" aria-label="Settings">
-                      <NavLink className="settings-dropdown-item" to="/settings" role="menuitem" onClick={() => setSettingsOpen(false)}>
+                      <NavLink className="settings-dropdown-item" to="/settings" role="menuitem" onClick={closeSettingsMenu}>
                         Settings
                       </NavLink>
-                      <NavLink className="settings-dropdown-item" to="/account" role="menuitem" onClick={() => setSettingsOpen(false)}>
+                      <NavLink className="settings-dropdown-item" to="/account" role="menuitem" onClick={closeSettingsMenu}>
                         Profile
                       </NavLink>
                     </div>
@@ -239,12 +338,7 @@ function AppLayout() {
                   )}
                 </button>
               </div>
-              <UserButton afterSignOutUrl="/">
-                <UserButton.MenuItems>
-                  <UserButton.Action label="Profile" onClick={() => navigate('/account')} />
-                  <UserButton.Action label="Settings" onClick={() => navigate('/settings')} />
-                </UserButton.MenuItems>
-              </UserButton>
+              <UserButton afterSignOutUrl="/" />
             </SignedIn>
           </div>
         </div>

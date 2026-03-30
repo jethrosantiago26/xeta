@@ -29,6 +29,13 @@ class ProductVariant extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $variant): void {
+            $variant->condition = 'new';
+        });
+    }
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);

@@ -3,6 +3,7 @@ import { addCartItem, getCart, removeCartItem, updateCartItem } from '../lib/api
 import { useSession } from './SessionContext.jsx'
 
 const CartContext = createContext(null)
+const REFRESH_INTERVAL_MS = 10000
 
 function normalizeCart(payload) {
   if (!payload) {
@@ -21,14 +22,16 @@ export function CartProvider({ children }) {
   const [totals, setTotals] = useState({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
   const [loading, setLoading] = useState(false)
 
-  const refreshCart = useCallback(async () => {
+  const refreshCart = useCallback(async ({ background = false } = {}) => {
     if (!profile) {
       setItems([])
       setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
       return
     }
 
-    setLoading(true)
+    if (!background) {
+      setLoading(true)
+    }
 
     try {
       const response = await getCart()
@@ -36,10 +39,14 @@ export function CartProvider({ children }) {
       setItems(cart.items)
       setTotals(cart.totals)
     } catch (error) {
-      setItems([])
-      setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
+      if (!background) {
+        setItems([])
+        setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
+      }
     } finally {
-      setLoading(false)
+      if (!background) {
+        setLoading(false)
+      }
     }
   }, [profile])
 
@@ -50,6 +57,28 @@ export function CartProvider({ children }) {
 
     refreshCart()
   }, [isLoaded, refreshCart])
+
+  useEffect(() => {
+    if (!isLoaded || !profile) {
+      return
+    }
+
+    function refreshVisibleCart() {
+      if (document.hidden) {
+        return
+      }
+
+      refreshCart({ background: true })
+    }
+
+    const intervalId = window.setInterval(refreshVisibleCart, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refreshVisibleCart)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshVisibleCart)
+    }
+  }, [isLoaded, profile, refreshCart])
 
   const value = {
     items,

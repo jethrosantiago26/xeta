@@ -7,10 +7,12 @@ use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\WishlistController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\SupportTicketController as AdminSupportTicketController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,6 +63,12 @@ Route::prefix('v1')->group(function () {
         // Reviews
         Route::post('products/{product}/reviews', [ReviewController::class, 'store']);
 
+        // Support (customer)
+        Route::get('support/tickets', [SupportTicketController::class, 'index']);
+        Route::post('support/tickets', [SupportTicketController::class, 'store']);
+        Route::get('support/tickets/{ticket}', [SupportTicketController::class, 'show']);
+        Route::post('support/tickets/{ticket}/messages', [SupportTicketController::class, 'storeMessage']);
+
         /*
         |--------------------------------------------------------------------------
         | Admin Routes (Clerk JWT + admin role)
@@ -84,6 +92,12 @@ Route::prefix('v1')->group(function () {
             // Order Management
             Route::get('orders', [AdminOrderController::class, 'index']);
             Route::put('orders/{order}', [AdminOrderController::class, 'update']);
+
+            // Support (admin)
+            Route::get('support/tickets', [AdminSupportTicketController::class, 'index']);
+            Route::get('support/tickets/{ticket}', [AdminSupportTicketController::class, 'show']);
+            Route::put('support/tickets/{ticket}', [AdminSupportTicketController::class, 'update']);
+            Route::post('support/tickets/{ticket}/messages', [AdminSupportTicketController::class, 'storeMessage']);
         });
     });
 });

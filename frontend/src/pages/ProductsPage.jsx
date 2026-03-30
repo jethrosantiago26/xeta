@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProductCard from '../components/ProductCard.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { getCategories, getProducts, readResource } from '../lib/api.js'
+
+const REFRESH_INTERVAL_MS = 15000
 
 function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -14,67 +16,86 @@ function ProductsPage() {
   const filters = {
     search: searchParams.get('search') ?? '',
     category: searchParams.get('category') ?? '',
-    condition: searchParams.get('condition') ?? '',
     sort: searchParams.get('sort') ?? 'latest',
     min_price: searchParams.get('min_price') ?? '',
     max_price: searchParams.get('max_price') ?? '',
     in_stock: searchParams.get('in_stock') ?? '',
   }
 
+  const loadProducts = useCallback(async ({ background = false } = {}) => {
+    if (!background) {
+      setLoading(true)
+    }
+
+    const requestFilters = {
+      search: searchParams.get('search') ?? '',
+      category: searchParams.get('category') ?? '',
+      sort: searchParams.get('sort') ?? 'latest',
+      min_price: searchParams.get('min_price') ?? '',
+      max_price: searchParams.get('max_price') ?? '',
+      in_stock: searchParams.get('in_stock') ?? '',
+    }
+
+    try {
+      const [productsResponse, categoriesResponse] = await Promise.all([
+        getProducts({
+          ...Object.fromEntries(
+            Object.entries(requestFilters).filter(([, value]) => value !== ''),
+          ),
+          per_page: 12,
+        }),
+        getCategories(),
+      ])
+
+      const productPayload = readResource(productsResponse)
+      const categoryPayload = readResource(categoriesResponse)
+
+      setProducts(productPayload.data ?? [])
+      setMeta(productPayload.meta ?? null)
+      setCategories(categoryPayload.data ?? [])
+    } catch {
+      if (!background) {
+        setProducts([])
+        setMeta(null)
+        setCategories([])
+      }
+    } finally {
+      if (!background) {
+        setLoading(false)
+      }
+    }
+  }, [searchParams])
+
   useEffect(() => {
     let active = true
 
-    async function loadProducts() {
-      setLoading(true)
-
-      const requestFilters = {
-        search: searchParams.get('search') ?? '',
-        category: searchParams.get('category') ?? '',
-        condition: searchParams.get('condition') ?? '',
-        sort: searchParams.get('sort') ?? 'latest',
-        min_price: searchParams.get('min_price') ?? '',
-        max_price: searchParams.get('max_price') ?? '',
-        in_stock: searchParams.get('in_stock') ?? '',
+    async function boot() {
+      if (!active) {
+        return
       }
 
-      try {
-        const [productsResponse, categoriesResponse] = await Promise.all([
-          getProducts({
-            ...Object.fromEntries(
-              Object.entries(requestFilters).filter(([, value]) => value !== ''),
-            ),
-            per_page: 12,
-          }),
-          getCategories(),
-        ])
-
-        const productPayload = readResource(productsResponse)
-        const categoryPayload = readResource(categoriesResponse)
-
-        if (active) {
-          setProducts(productPayload.data ?? [])
-          setMeta(productPayload.meta ?? null)
-          setCategories(categoryPayload.data ?? [])
-        }
-      } catch {
-        if (active) {
-          setProducts([])
-          setMeta(null)
-          setCategories([])
-        }
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
-      }
+      await loadProducts()
     }
 
-    loadProducts()
+    function refreshVisibleData() {
+      if (document.hidden || !active) {
+        return
+      }
+
+      loadProducts({ background: true })
+    }
+
+    boot()
+
+    const intervalId = window.setInterval(refreshVisibleData, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refreshVisibleData)
 
     return () => {
       active = false
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshVisibleData)
     }
-  }, [searchParams])
+  }, [loadProducts])
 
   function updateFilter(key, value) {
     const next = new URLSearchParams(searchParams)
@@ -93,7 +114,7 @@ function ProductsPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Products"
-        description="Filter peripherals by price, stock, category, and condition."
+        description="Filter peripherals by price, stock, and category."
       />
 
       <section className="filter-panel">
@@ -115,15 +136,6 @@ function ProductsPage() {
                 {category.name}
               </option>
             ))}
-          </select>
-          <select
-            className="select"
-            value={filters.condition}
-            onChange={(event) => updateFilter('condition', event.target.value)}
-          >
-            <option value="">All conditions</option>
-            <option value="new">New</option>
-            <option value="used">Used</option>
           </select>
           <select
             className="select"

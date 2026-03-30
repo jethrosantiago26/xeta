@@ -1,9 +1,15 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1',
   withCredentials: true,
 })
+
+let authTokenProvider = null
+
+export function setApiAuthTokenProvider(provider) {
+  authTokenProvider = provider
+}
 
 export function setApiAuthToken(token) {
   if (token) {
@@ -13,6 +19,44 @@ export function setApiAuthToken(token) {
 
   delete api.defaults.headers.common.Authorization
 }
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const status = error?.response?.status
+    const originalRequest = error?.config
+
+    if (status !== 401 || !originalRequest || originalRequest.__retriedWithFreshToken) {
+      return Promise.reject(error)
+    }
+
+    if (!authTokenProvider) {
+      return Promise.reject(error)
+    }
+
+    originalRequest.__retriedWithFreshToken = true
+
+    try {
+      const freshToken = await authTokenProvider()
+
+      if (!freshToken) {
+        setApiAuthToken(null)
+        return Promise.reject(error)
+      }
+
+      setApiAuthToken(freshToken)
+      originalRequest.headers = {
+        ...(originalRequest.headers || {}),
+        Authorization: `Bearer ${freshToken}`,
+      }
+
+      return api.request(originalRequest)
+    } catch {
+      setApiAuthToken(null)
+      return Promise.reject(error)
+    }
+  },
+)
 
 export async function getProducts(params = {}) {
   return api.get('/products', { params })
@@ -70,6 +114,38 @@ export async function getAdminDashboard() {
   return api.get('/admin/dashboard')
 }
 
+export async function getSupportTickets(params = {}) {
+  return api.get('/support/tickets', { params })
+}
+
+export async function getSupportTicket(ticketId) {
+  return api.get(`/support/tickets/${ticketId}`)
+}
+
+export async function createSupportTicket(payload) {
+  return api.post('/support/tickets', payload)
+}
+
+export async function createSupportMessage(ticketId, payload) {
+  return api.post(`/support/tickets/${ticketId}/messages`, payload)
+}
+
+export async function getAdminSupportTickets(params = {}) {
+  return api.get('/admin/support/tickets', { params })
+}
+
+export async function getAdminSupportTicket(ticketId) {
+  return api.get(`/admin/support/tickets/${ticketId}`)
+}
+
+export async function updateAdminSupportTicket(ticketId, payload) {
+  return api.put(`/admin/support/tickets/${ticketId}`, payload)
+}
+
+export async function createAdminSupportMessage(ticketId, payload) {
+  return api.post(`/admin/support/tickets/${ticketId}/messages`, payload)
+}
+
 export async function getAdminProducts(params = {}) {
   return api.get('/admin/products', { params })
 }
@@ -78,8 +154,29 @@ export async function createAdminProduct(payload) {
   return api.post('/admin/products', payload)
 }
 
+export async function updateAdminProduct(productId, payload) {
+  return api.put(`/admin/products/${productId}`, payload)
+}
+
+export async function deleteAdminProduct(productId) {
+  return api.delete(`/admin/products/${productId}`)
+}
+
 export async function createAdminProductVariant(productId, payload) {
   return api.post(`/admin/products/${productId}/variants`, payload)
+}
+
+export async function updateAdminProductVariant(productId, variantId, payload) {
+  if (payload instanceof FormData) {
+    payload.append('_method', 'PUT')
+    return api.post(`/admin/products/${productId}/variants/${variantId}`, payload)
+  }
+
+  return api.put(`/admin/products/${productId}/variants/${variantId}`, payload)
+}
+
+export async function deleteAdminProductVariant(productId, variantId) {
+  return api.delete(`/admin/products/${productId}/variants/${variantId}`)
 }
 
 export function readResource(response) {

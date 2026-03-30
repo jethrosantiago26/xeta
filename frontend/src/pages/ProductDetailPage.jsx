@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { getProduct, readResource } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
+import { getVariantVisual } from '../lib/variantVisuals.js'
 
 function ProductDetailPage() {
   const { slug } = useParams()
@@ -48,11 +49,21 @@ function ProductDetailPage() {
     }
   }, [slug])
 
+  const visualVariants = useMemo(() => {
+    return (product?.variants ?? []).map((variant, index) => ({
+      ...variant,
+      visual: getVariantVisual(variant, {
+        index,
+        productName: product?.name,
+      }),
+    }))
+  }, [product])
+
   const selectedVariant = useMemo(() => {
-    return product?.variants?.find((variant) => String(variant.id) === selectedVariantId)
-      ?? product?.variants?.[0]
+    return visualVariants.find((variant) => String(variant.id) === selectedVariantId)
+      ?? visualVariants[0]
       ?? null
-  }, [product, selectedVariantId])
+  }, [visualVariants, selectedVariantId])
 
   if (loading) {
     return (
@@ -78,7 +89,7 @@ function ProductDetailPage() {
     )
   }
 
-  const image = product.primary_image || product.images?.[0]?.url || '/vite.svg'
+  const image = selectedVariant?.visual?.image || product.primary_image || product.images?.[0]?.url || '/vite.svg'
   const price = selectedVariant?.price ?? product.lowest_price ?? 0
 
   return (
@@ -102,22 +113,36 @@ function ProductDetailPage() {
             ) : null}
           </div>
 
-          <div className="stack">
-            <label className="muted" htmlFor="variant">
-              Variant
-            </label>
-            <select
-              id="variant"
-              className="select"
-              value={selectedVariantId}
-              onChange={(event) => setSelectedVariantId(event.target.value)}
-            >
-              {product.variants?.map((variant) => (
-                <option key={variant.id} value={variant.id}>
-                  {variant.name} - {formatMoney(variant.price)}
-                </option>
-              ))}
-            </select>
+          <div className="stack variant-selector">
+            <p className="muted variant-selector-label">Variant finish</p>
+            <div className="variant-meatballs" role="radiogroup" aria-label="Choose product variant">
+              {visualVariants.map((variant) => {
+                const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+
+                return (
+                  <button
+                    key={variant.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isActive}
+                    aria-label={`${variant.name} ${formatMoney(variant.price)}`}
+                    className={`variant-meatball${isActive ? ' active' : ''}`}
+                    style={{
+                      '--variant-color': variant.visual.color,
+                      '--variant-ring': variant.visual.ringColor,
+                      '--variant-ink': variant.visual.textColor,
+                    }}
+                    onClick={() => setSelectedVariantId(String(variant.id))}
+                  />
+                )
+              })}
+            </div>
+            {selectedVariant ? (
+              <div className="variant-selection-summary">
+                <span>{selectedVariant.name}</span>
+                <span>{formatMoney(selectedVariant.price)}</span>
+              </div>
+            ) : null}
           </div>
 
           {selectedVariant ? (
@@ -174,7 +199,7 @@ function ProductDetailPage() {
           <h3>Variants</h3>
           <div className="divider" />
           <div className="stack">
-            {product.variants?.map((variant) => (
+            {visualVariants.map((variant) => (
               <div key={variant.id} className="row" style={{ justifyContent: 'space-between' }}>
                 <span>{variant.name}</span>
                 <span>{formatMoney(variant.price)}</span>

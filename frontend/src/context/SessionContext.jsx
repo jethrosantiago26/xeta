@@ -5,6 +5,45 @@ import { getBrowserCoordinates, reverseGeocodeCoordinates } from '../lib/locatio
 
 const SessionContext = createContext(null)
 const LOCATION_SETUP_STORAGE_KEY = 'xeta:auto-location-setup:v1'
+const SESSION_PROFILE_STORAGE_PREFIX = 'xeta:session-profile:v1:'
+
+function getSessionProfileStorageKey(userId) {
+  return `${SESSION_PROFILE_STORAGE_PREFIX}${userId || 'anonymous'}`
+}
+
+function readCachedProfile(userId) {
+  if (!userId) {
+    return null
+  }
+
+  try {
+    const raw = localStorage.getItem(getSessionProfileStorageKey(userId))
+    if (!raw) {
+      return null
+    }
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
+
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCachedProfile(userId, profile) {
+  if (!userId || !profile) {
+    return
+  }
+
+  try {
+    localStorage.setItem(getSessionProfileStorageKey(userId), JSON.stringify(profile))
+  } catch {
+    // Ignore localStorage write failures.
+  }
+}
 
 function hasSavedLocation(profile) {
   return Boolean(
@@ -71,7 +110,7 @@ function normalizeUser(payload) {
 }
 
 export function SessionProvider({ children }) {
-  const { isLoaded, isSignedIn, getToken } = useAuth()
+  const { isLoaded, isSignedIn, getToken, userId } = useAuth()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -90,10 +129,16 @@ export function SessionProvider({ children }) {
         return
       }
 
-      setLoading(true)
+      const cachedProfile = readCachedProfile(userId)
+      if (cachedProfile) {
+        setProfile(cachedProfile)
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
 
       try {
-        const token = await getToken({ skipCache: true })
+        const token = await getToken()
         setApiAuthToken(token)
         try {
           await syncAuth()
@@ -101,12 +146,27 @@ export function SessionProvider({ children }) {
           // Continue with getMe so existing users can still load their profile.
         }
         const response = await getMe()
-        let currentUser = normalizeUser(response.data)
-        currentUser = await tryAutoSetupLocation(currentUser)
+        const currentUser = normalizeUser(response.data)
 
         if (active) {
           setProfile(currentUser)
+          writeCachedProfile(userId, currentUser)
         }
+
+        // Do location auto-setup in the background so session gate is not delayed.
+        Promise.resolve()
+          .then(() => tryAutoSetupLocation(currentUser))
+          .then((updatedProfile) => {
+            if (!active || !updatedProfile) {
+              return
+            }
+
+            setProfile(updatedProfile)
+            writeCachedProfile(userId, updatedProfile)
+          })
+          .catch(() => {
+            // Ignore background location setup errors.
+          })
       } catch (error) {
         if (active) {
           setProfile(null)
@@ -140,6 +200,7 @@ export function SessionProvider({ children }) {
       const response = await getMe()
       const currentUser = normalizeUser(response.data)
       setProfile(currentUser)
+      writeCachedProfile(userId, currentUser)
       return currentUser
     },
   }

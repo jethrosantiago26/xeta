@@ -1,9 +1,34 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '../lib/format.js'
+import { getVariantVisual } from '../lib/variantVisuals.js'
 
 function ProductCard({ product }) {
-  const image = product.primary_image || product.images?.[0]?.url || '/vite.svg'
-  const price = product.lowest_price ?? product.variants?.[0]?.price ?? 0
+  const visualVariants = useMemo(() => {
+    return (product.variants ?? []).map((variant, index) => ({
+      ...variant,
+      visual: getVariantVisual(variant, {
+        index,
+        productName: product.name,
+      }),
+    }))
+  }, [product])
+
+  const [selectedVariantId, setSelectedVariantId] = useState(String(visualVariants[0]?.id ?? ''))
+
+  const selectedVariant = useMemo(() => {
+    return visualVariants.find((variant) => String(variant.id) === selectedVariantId)
+      ?? visualVariants[0]
+      ?? null
+  }, [visualVariants, selectedVariantId])
+
+  const image = selectedVariant?.visual?.image || product.primary_image || product.images?.[0]?.url || '/vite.svg'
+  const price = selectedVariant?.price ?? product.lowest_price ?? product.variants?.[0]?.price ?? 0
+  const priceLabel = selectedVariant
+    ? formatMoney(price)
+    : price > 0
+      ? `from ${formatMoney(price)}`
+      : 'See options'
 
   return (
     <article className="product-card">
@@ -23,10 +48,32 @@ function ProductCard({ product }) {
         <p className="muted" style={{ fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {product.description?.slice(0, 100) || 'High quality peripherals for work and play.'}
         </p>
+        {visualVariants.length > 1 ? (
+          <div className="product-card-variant-menu" role="radiogroup" aria-label={`Choose ${product.name} variant preview`}>
+            {visualVariants.map((variant) => {
+              const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+
+              return (
+                <button
+                  key={variant.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  aria-label={`${variant.name} ${formatMoney(variant.price)}`}
+                  className={`product-card-meatball${isActive ? ' active' : ''}`}
+                  style={{
+                    '--variant-color': variant.visual.color,
+                    '--variant-ring': variant.visual.ringColor,
+                    '--variant-ink': variant.visual.textColor,
+                  }}
+                  onClick={() => setSelectedVariantId(String(variant.id))}
+                />
+              )
+            })}
+          </div>
+        ) : null}
         <div className="row" style={{ justifyContent: 'space-between', marginTop: '4px' }}>
-          <strong className="price">
-            {price > 0 ? `from ${formatMoney(price)}` : 'See options'}
-          </strong>
+          <strong className="price">{priceLabel}</strong>
           <Link
             className="button button-secondary"
             to={`/products/${product.slug}`}

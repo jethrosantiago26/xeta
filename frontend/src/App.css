@@ -376,7 +376,8 @@ img {
   position: relative;
 }
 
-.nav-dropdown summary {
+.nav-dropdown summary,
+.nav-dropdown-trigger {
   list-style: none;
   color: var(--color-text-secondary);
   text-decoration: none;
@@ -388,6 +389,11 @@ img {
   letter-spacing: 0.01em;
   cursor: pointer;
   user-select: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
 }
 
 .nav-dropdown summary::-webkit-details-marker {
@@ -395,7 +401,9 @@ img {
 }
 
 .nav-dropdown:hover summary,
-.nav-dropdown[open] summary {
+.nav-dropdown:hover .nav-dropdown-trigger,
+.nav-dropdown[open] summary,
+.nav-dropdown.open .nav-dropdown-trigger {
   color: var(--color-text-primary);
   background: rgba(255, 255, 255, 0.06);
 }
@@ -684,6 +692,188 @@ h3 {
 }
 
 /* ============================================================
+   ADMIN PRODUCTS STUDIO
+   ============================================================ */
+
+.admin-products-layout {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.admin-product-form-card,
+.admin-products-summary-card {
+  position: relative;
+  border-radius: 22px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    var(--color-surface);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.admin-product-form-card {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-product-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-product-form-subtitle {
+  margin: 6px 0 0;
+}
+
+.admin-product-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-product-section-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.admin-product-fields {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.admin-product-fields .textarea {
+  grid-column: 1 / -1;
+}
+
+.admin-product-variants-stack {
+  gap: 12px;
+}
+
+.admin-product-variants-head {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-product-inline-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.admin-product-variant-card,
+.admin-product-row-card {
+  padding: 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01)),
+    rgba(255, 255, 255, 0.01);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.admin-product-variant-actions {
+  margin-top: 10px;
+}
+
+.admin-product-image-caption {
+  margin-top: 10px;
+}
+
+.admin-product-submit-wrap {
+  position: sticky;
+  bottom: 10px;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(13, 13, 13, 0.66);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.admin-product-row-head {
+  justify-content: space-between;
+}
+
+.admin-product-edit-stack {
+  margin-top: 12px;
+}
+
+.admin-product-edit-variants-scroll {
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.admin-product-edit-variants-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-product-edit-variants-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+}
+
+.admin-product-variant-preview {
+  width: 100%;
+  max-height: 170px;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.3);
+  margin-top: 10px;
+}
+
+.admin-product-edit-actions {
+  padding-top: 4px;
+}
+
+:root[data-theme='light'] .admin-product-form-card,
+:root[data-theme='light'] .admin-products-summary-card {
+  border-color: rgba(15, 23, 42, 0.13);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 249, 255, 0.94)),
+    #ffffff;
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+:root[data-theme='light'] .admin-product-form-head {
+  border-bottom-color: rgba(15, 23, 42, 0.12);
+}
+
+:root[data-theme='light'] .admin-product-section,
+:root[data-theme='light'] .admin-product-variant-card,
+:root[data-theme='light'] .admin-product-row-card {
+  border-color: rgba(15, 23, 42, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 250, 255, 0.92)),
+    #ffffff;
+}
+
+:root[data-theme='light'] .admin-product-submit-wrap {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+:root[data-theme='light'] .admin-product-variant-preview {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(248, 250, 255, 0.96);
+}
+
+/* ============================================================
    HERO PANEL — full-bleed dark like PDF
    ============================================================ */
 
@@ -836,6 +1026,93 @@ h3 {
 
 .hero-media:hover img {
   transform: scale(1.02);
+}
+
+.variant-selector {
+  gap: 10px;
+}
+
+.variant-selector-label {
+  margin: 0;
+}
+
+.variant-meatballs,
+.product-card-variant-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.variant-meatball,
+.product-card-meatball {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid var(--variant-ring, rgba(255, 255, 255, 0.85));
+  background: var(--variant-color, #64748b);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--ease-spring),
+    box-shadow var(--transition),
+    border-color var(--transition);
+}
+
+.product-card-meatball {
+  width: 18px;
+  height: 18px;
+  border-width: 1.5px;
+}
+
+.variant-meatball:hover,
+.product-card-meatball:hover {
+  transform: translateY(-1px);
+}
+
+.variant-meatball:focus-visible,
+.product-card-meatball:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.32),
+    0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.variant-meatball.active,
+.product-card-meatball.active {
+  transform: scale(1.08);
+  border-color: var(--variant-ink, #ffffff);
+  box-shadow:
+    0 0 0 2px var(--variant-ring, rgba(255, 255, 255, 0.9)),
+    0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.variant-selection-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme='light'] .variant-meatball:focus-visible,
+:root[data-theme='light'] .product-card-meatball:focus-visible {
+  box-shadow:
+    0 0 0 3px rgba(15, 23, 42, 0.16),
+    0 2px 12px rgba(15, 23, 42, 0.15);
+}
+
+:root[data-theme='light'] .variant-selection-summary {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(15, 23, 42, 0.13);
 }
 
 /* ============================================================
@@ -1244,6 +1521,14 @@ h3 {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+:root[data-theme='light'] .input,
+:root[data-theme='light'] .select,
+:root[data-theme='light'] .textarea,
+:root[data-theme='light'] .field {
+  border-color: rgba(15, 23, 42, 0.22);
+  background: rgba(255, 255, 255, 0.97);
 }
 
 :root[data-theme='light'] .admin-main .input,
@@ -1792,6 +2077,12 @@ h3 {
   }
 
   .nav-dropdown summary {
+    padding: 6px 12px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  .nav-dropdown-trigger {
     padding: 6px 12px;
     font-size: 12.5px;
     white-space: nowrap;

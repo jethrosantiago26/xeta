@@ -6,4 +6,5 @@ return [
     'jwks_url' => env('CLERK_JWKS_URL', 'https://api.clerk.com/v1/jwks'),
     'jwt_key' => env('CLERK_JWT_KEY'),
     'jwks_cache_ttl' => env('CLERK_JWKS_CACHE_TTL', 3600),
+    'jwt_leeway' => env('CLERK_JWT_LEEWAY', 60),
 ];

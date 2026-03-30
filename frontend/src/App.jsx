@@ -18,7 +18,9 @@ import ProductDetailPage from './pages/ProductDetailPage.jsx'
 import ProductsPage from './pages/ProductsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import SetupPage from './pages/SetupPage.jsx'
-import { setApiAuthToken } from './lib/api.js'
+import SupportPage from './pages/SupportPage.jsx'
+import AdminSupportPage from './pages/AdminSupportPage.jsx'
+import { setApiAuthToken, setApiAuthTokenProvider } from './lib/api.js'
 import './App.css'
 
 function AuthBridge() {
@@ -34,8 +36,17 @@ function AuthBridge() {
 
       if (!isSignedIn) {
         setApiAuthToken(null)
+        setApiAuthTokenProvider(null)
         return
       }
+
+      setApiAuthTokenProvider(async () => {
+        if (!isSignedIn) {
+          return null
+        }
+
+        return getToken({ skipCache: true })
+      })
 
       const token = await getToken({ skipCache: true })
 
@@ -44,7 +55,10 @@ function AuthBridge() {
       }
     }
 
-    syncToken().catch(() => setApiAuthToken(null))
+    syncToken().catch(() => {
+      setApiAuthToken(null)
+      setApiAuthTokenProvider(null)
+    })
 
     return () => {
       active = false
@@ -180,6 +194,14 @@ function App({ clerkReady }) {
               }
             />
             <Route
+              path="support"
+              element={
+                <ProtectedRoute disallowAdmin>
+                  <SupportPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="account"
               element={
                 <ProtectedRoute>
@@ -208,6 +230,14 @@ function App({ clerkReady }) {
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/support"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminSupportPage />
                 </ProtectedRoute>
               }
             />

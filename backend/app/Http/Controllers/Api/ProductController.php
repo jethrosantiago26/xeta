@@ -21,7 +21,7 @@ class ProductController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $filters = $request->only([
-            'category', 'condition', 'min_price', 'max_price',
+            'category', 'min_price', 'max_price',
             'in_stock', 'search', 'sort',
         ]);
 

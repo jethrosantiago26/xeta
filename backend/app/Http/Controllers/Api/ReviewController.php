@@ -20,13 +20,15 @@ class ReviewController extends Controller
     {
         $user = $request->user();
         $orderId = $request->validated('order_id');
+        $variantId = $request->validated('variant_id');
 
-        // Verify the user actually purchased this product
+        // Verify the selected variant belongs to this product and was purchased in the given order.
         $hasPurchased = Order::where('id', $orderId)
             ->where('user_id', $user->id)
             ->where('status', '!=', 'cancelled')
-            ->whereHas('items', function ($q) use ($product) {
-                $q->whereHas('variant', fn ($q2) => $q2->where('product_id', $product->id));
+            ->whereHas('items', function ($q) use ($product, $variantId) {
+                $q->where('variant_id', $variantId)
+                    ->whereHas('variant', fn ($q2) => $q2->where('product_id', $product->id));
             })
             ->exists();
 
@@ -36,30 +38,64 @@ class ReviewController extends Controller
             ], 403);
         }
 
-        // Check for existing review
+        // Enforce one review per purchased variant.
         $existingReview = Review::where('user_id', $user->id)
-            ->where('product_id', $product->id)
-            ->where('order_id', $orderId)
+            ->where('variant_id', $variantId)
             ->exists();
 
         if ($existingReview) {
             return response()->json([
-                'message' => 'You have already reviewed this product for this order',
+                'message' => 'You have already reviewed this variant. Please edit your existing review.',
             ], 409);
         }
 
         $review = Review::create([
             'user_id' => $user->id,
             'product_id' => $product->id,
+            'variant_id' => $variantId,
             'order_id' => $orderId,
             'rating' => $request->validated('rating'),
             'comment' => $request->validated('comment'),
+            'is_anonymous' => $request->boolean('is_anonymous'),
             'is_approved' => true, // Auto-approve; change to false for moderation
         ]);
 
         return response()->json([
             'message' => 'Review submitted',
-            'review' => new ReviewResource($review),
+            'review' => new ReviewResource($review->load(['user', 'variant'])),
         ], 201);
+    }
+
+    /**
+     * Update an existing review for a product.
+     */
+    public function update(Request $request, Product $product, Review $review): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($review->user_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        if ($review->product_id !== $product->id) {
+            return response()->json(['message' => 'Review does not belong to this product'], 400);
+        }
+
+        $validated = $request->validate([
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'comment' => ['nullable', 'string', 'max:2000'],
+            'is_anonymous' => ['nullable', 'boolean'],
+        ]);
+
+        $review->update([
+            'rating' => $validated['rating'],
+            'comment' => $validated['comment'] ?? null,
+            'is_anonymous' => $request->boolean('is_anonymous'),
+        ]);
+
+        return response()->json([
+            'message' => 'Review updated successfully',
+            'review' => new ReviewResource($review->load(['user', 'variant'])),
+        ]);
     }
 }

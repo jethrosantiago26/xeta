@@ -10,10 +10,12 @@ class Review extends Model
     protected $fillable = [
         'user_id',
         'product_id',
+        'variant_id',
         'order_id',
         'rating',
         'comment',
         'is_approved',
+        'is_anonymous',
     ];
 
     protected function casts(): array
@@ -31,6 +33,11 @@ class Review extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
     public function order(): BelongsTo

@@ -77,7 +77,7 @@ class ProductService
                 'category',
                 'variants' => fn ($q) => $q->active()->where('condition', 'new'),
                 'images',
-                'reviews' => fn ($q) => $q->approved()->with('user')->latest(),
+                'reviews' => fn ($q) => $q->approved()->with(['user', 'variant'])->latest(),
             ])
             ->firstOrFail();
     }

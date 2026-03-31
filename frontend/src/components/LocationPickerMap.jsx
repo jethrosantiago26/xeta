@@ -1,6 +1,7 @@
 import L from 'leaflet'
 import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 
 function ClickHandler({ onSelect }) {
   useMapEvents({

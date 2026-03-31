@@ -33,7 +33,7 @@ function ProductCard({ product }) {
   return (
     <article className="product-card">
       <Link to={`/products/${product.slug}`} style={{ display: 'block', overflow: 'hidden', borderRadius: '10px' }}>
-        <img src={image} alt={product.name} />
+        <img src={image} alt={product.name} loading="lazy" decoding="async" />
       </Link>
       <div className="stack" style={{ marginTop: '14px', gap: '8px' }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>

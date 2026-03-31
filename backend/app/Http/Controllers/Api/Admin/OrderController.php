@@ -40,7 +40,7 @@ class OrderController extends Controller
 
         return response()->json([
             'message' => 'Order status updated',
-            'order' => new OrderResource($orderModel->load('items')),
+            'order' => new OrderResource($orderModel->load('items.variant.product.images')),
         ]);
     }
 }

@@ -1,25 +1,41 @@
 import { useEffect, useRef, useState } from 'react'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext.jsx'
 import { useTheme } from '../../context/ThemeContext.jsx'
+import {
+  prefetchOrdersRoute,
+  prefetchShopRoutes,
+  prefetchSupportRoutes,
+} from '../../lib/routePrefetch.js'
 
 function AppLayout() {
   const { profile, loading, isSignedIn } = useSession()
   const isAdmin = profile?.role === 'admin'
   const { isDark, toggleTheme } = useTheme()
+  const location = useLocation()
   const [shopMenuOpen, setShopMenuOpen] = useState(false)
   const [shopMenuPinned, setShopMenuPinned] = useState(false)
   const shopMenuRef = useRef(null)
+  const [supportMenuOpen, setSupportMenuOpen] = useState(false)
+  const [supportMenuPinned, setSupportMenuPinned] = useState(false)
+  const supportMenuRef = useRef(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsPinned, setSettingsPinned] = useState(false)
   const settingsMenuRef = useRef(null)
+
+  const supportMenuActive = location.pathname === '/support' || location.pathname === '/faq'
 
   useEffect(() => {
     function handleDocumentClick(event) {
       if (shopMenuRef.current && !shopMenuRef.current.contains(event.target)) {
         setShopMenuOpen(false)
         setShopMenuPinned(false)
+      }
+
+      if (supportMenuRef.current && !supportMenuRef.current.contains(event.target)) {
+        setSupportMenuOpen(false)
+        setSupportMenuPinned(false)
       }
 
       if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target)) {
@@ -42,11 +58,11 @@ function AppLayout() {
   ]
 
   const adminCommerceMenu = [
-    { label: 'Orders', note: 'Queue and fulfillment' },
-    { label: 'Customers', note: 'Segmentation and support' },
-    { label: 'Inventory', note: 'Stock and low-level alerts' },
-    { label: 'Reviews', note: 'Moderation pipeline' },
-    { label: 'Analytics', note: 'Revenue and conversion' },
+    { to: '/admin/orders', label: 'Orders', note: 'Queue and fulfillment' },
+    { to: '/admin/customers', label: 'Customers', note: 'Segmentation and support' },
+    { to: '/admin/inventory', label: 'Inventory', note: 'Stock and low-level alerts' },
+    { to: '/admin/reviews', label: 'Reviews', note: 'Moderation pipeline' },
+    { to: '/admin/analytics', label: 'Analytics', note: 'Revenue and conversion' },
   ]
 
   const adminSystemMenu = [
@@ -57,6 +73,11 @@ function AppLayout() {
   function closeShopMenu() {
     setShopMenuOpen(false)
     setShopMenuPinned(false)
+  }
+
+  function closeSupportMenu() {
+    setSupportMenuOpen(false)
+    setSupportMenuPinned(false)
   }
 
   function closeSettingsMenu() {
@@ -145,12 +166,27 @@ function AppLayout() {
 
             <div className="admin-sidebar-group">
               <p className="admin-sidebar-title">Commerce</p>
-              {adminCommerceMenu.map((item) => (
-                <div key={item.label} className="admin-side-link disabled" aria-disabled="true">
-                  <span>{item.label}</span>
-                  <small>{item.note}</small>
-                </div>
-              ))}
+              {adminCommerceMenu.map((item) => {
+                if (!item.to || item.to.includes('customers') || item.to.includes('inventory') || item.to.includes('analytics') || item.to.includes('orders')) {
+                  return (
+                    <div key={item.label} className="admin-side-link disabled" aria-disabled="true">
+                      <span>{item.label}</span>
+                      <small>{item.note}</small>
+                    </div>
+                  )
+                }
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+                  >
+                    <span>{item.label}</span>
+                    <small>{item.note}</small>
+                  </NavLink>
+                )
+              })}
             </div>
 
             <div className="admin-sidebar-group">
@@ -188,10 +224,14 @@ function AppLayout() {
               className={`nav-dropdown${shopMenuOpen ? ' open' : ''}`}
               ref={shopMenuRef}
               onMouseEnter={() => {
+                prefetchShopRoutes()
+
                 if (!shopMenuPinned) {
                   setShopMenuOpen(true)
                 }
               }}
+              onFocusCapture={prefetchShopRoutes}
+              onTouchStart={prefetchShopRoutes}
               onMouseLeave={() => {
                 if (!shopMenuPinned) {
                   setShopMenuOpen(false)
@@ -209,6 +249,7 @@ function AppLayout() {
                     setShopMenuOpen(nextPinned)
 
                     if (nextPinned) {
+                      closeSupportMenu()
                       closeSettingsMenu()
                     }
 
@@ -241,8 +282,70 @@ function AppLayout() {
                 </div>
               ) : null}
             </div>
-            <NavLink to="/orders">Orders</NavLink>
-            <NavLink to="/support">Support</NavLink>
+            <div
+              className={`nav-dropdown${supportMenuOpen ? ' open' : ''}`}
+              ref={supportMenuRef}
+              onMouseEnter={() => {
+                prefetchSupportRoutes()
+
+                if (!supportMenuPinned) {
+                  setSupportMenuOpen(true)
+                }
+              }}
+              onFocusCapture={prefetchSupportRoutes}
+              onTouchStart={prefetchSupportRoutes}
+              onMouseLeave={() => {
+                if (!supportMenuPinned) {
+                  setSupportMenuOpen(false)
+                }
+              }}
+            >
+              <button
+                type="button"
+                className={`nav-dropdown-trigger${supportMenuActive ? ' active' : ''}`}
+                aria-expanded={supportMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => {
+                  setSupportMenuPinned((value) => {
+                    const nextPinned = !value
+                    setSupportMenuOpen(nextPinned)
+
+                    if (nextPinned) {
+                      closeShopMenu()
+                      closeSettingsMenu()
+                    }
+
+                    return nextPinned
+                  })
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    closeSupportMenu()
+                  }
+                }}
+              >
+                Support
+              </button>
+
+              {supportMenuOpen ? (
+                <div className="nav-dropdown-menu" role="menu" aria-label="Support links">
+                  <NavLink to="/support" role="menuitem" onClick={closeSupportMenu}>
+                    Support Center
+                  </NavLink>
+                  <NavLink to="/faq" role="menuitem" onClick={closeSupportMenu}>
+                    FAQ
+                  </NavLink>
+                </div>
+              ) : null}
+            </div>
+            <NavLink
+              to="/orders"
+              onMouseEnter={prefetchOrdersRoute}
+              onFocus={prefetchOrdersRoute}
+              onTouchStart={prefetchOrdersRoute}
+            >
+              Orders
+            </NavLink>
           </nav>
 
           <div className="actions" style={{ gap: '8px' }}>
@@ -290,6 +393,7 @@ function AppLayout() {
 
                         if (nextPinned) {
                           closeShopMenu()
+                          closeSupportMenu()
                         }
 
                         return nextPinned

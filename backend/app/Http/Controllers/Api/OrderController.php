@@ -34,7 +34,10 @@ class OrderController extends Controller
     {
         $orderModel = $request->user()
             ->orders()
-            ->with('items')
+            ->with([
+                'items.variant.product.images',
+                'items.variant.product.reviews' => fn ($query) => $query->where('user_id', $request->user()->id),
+            ])
             ->findOrFail($order);
 
         return new OrderResource($orderModel);

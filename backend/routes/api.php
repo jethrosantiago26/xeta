@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\WishlistController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\SupportTicketController as AdminSupportTicketController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,6 +63,7 @@ Route::prefix('v1')->group(function () {
 
         // Reviews
         Route::post('products/{product}/reviews', [ReviewController::class, 'store']);
+        Route::put('products/{product}/reviews/{review}', [ReviewController::class, 'update']);
 
         // Support (customer)
         Route::get('support/tickets', [SupportTicketController::class, 'index']);
@@ -98,6 +100,11 @@ Route::prefix('v1')->group(function () {
             Route::get('support/tickets/{ticket}', [AdminSupportTicketController::class, 'show']);
             Route::put('support/tickets/{ticket}', [AdminSupportTicketController::class, 'update']);
             Route::post('support/tickets/{ticket}/messages', [AdminSupportTicketController::class, 'storeMessage']);
+
+            // Reviews (admin)
+            Route::get('reviews', [AdminReviewController::class, 'index']);
+            Route::put('reviews/{review}', [AdminReviewController::class, 'update']);
+            Route::delete('reviews/{review}', [AdminReviewController::class, 'destroy']);
         });
     });
 });

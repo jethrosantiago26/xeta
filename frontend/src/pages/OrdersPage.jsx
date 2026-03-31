@@ -7,6 +7,15 @@ import { formatMoney } from '../lib/format.js'
 
 const REFRESH_INTERVAL_MS = 12000
 
+function getOrderItemImage(item) {
+  return item?.variant?.image_url || item?.product?.image_url || '/vite.svg'
+}
+
+function formatRatingStars(ratingValue) {
+  const safeRating = Math.max(1, Math.min(5, Number(ratingValue) || 0))
+  return `${'★'.repeat(safeRating)}${'☆'.repeat(5 - safeRating)}`
+}
+
 function OrdersPage() {
   const { isLoaded, isSignedIn, loading: sessionLoading } = useSession()
   const [orders, setOrders] = useState([])
@@ -122,6 +131,66 @@ function OrdersPage() {
                 <span className="status-pill">{order.status}</span>
               </div>
               <div className="divider" />
+              <div className="order-card-summary row" style={{ justifyContent: 'space-between' }}>
+                <span>{(order.items ?? []).length} item{(order.items ?? []).length === 1 ? '' : 's'}</span>
+                <strong>{formatMoney(order.total)}</strong>
+              </div>
+              <div className="order-items-panel">
+                <p className="muted order-items-heading">Products in this order</p>
+                <div className="order-items-scroll">
+                  {(order.items ?? []).length === 0 ? (
+                    <p className="muted" style={{ margin: 0 }}>Item details are not available for this order.</p>
+                  ) : (
+                    (order.items ?? []).map((item) => {
+                      const productSlug = item?.product?.slug
+                      const itemReview = item?.review
+                      const productLink = productSlug ? `/products/${productSlug}` : null
+
+                      return (
+                        <div key={item.id} className="order-item-card">
+                          <img
+                            src={getOrderItemImage(item)}
+                            alt={item.product_name}
+                            className="order-item-thumb"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                          <div className="order-item-content">
+                            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div>
+                                <p className="order-item-name">{item.product_name}</p>
+                                <p className="muted order-item-variant">{item.variant_name}</p>
+                              </div>
+                              <p className="order-item-total">{formatMoney(item.total)}</p>
+                            </div>
+
+                            <div className="row" style={{ justifyContent: 'space-between' }}>
+                              <p className="muted order-item-meta">Qty {item.quantity} · {formatMoney(item.unit_price)} each</p>
+                              {productLink ? (
+                                <Link className="order-item-link" to={productLink}>
+                                  View
+                                </Link>
+                              ) : null}
+                            </div>
+
+                            {itemReview && productLink ? (
+                              <Link className="order-item-review-link" to={productLink} title="Open product page">
+                                <div className="order-item-review-row">
+                                  <span className="order-item-review-label">Your review</span>
+                                  <span className="order-item-review-stars">{formatRatingStars(itemReview.rating)}</span>
+                                </div>
+                                <p className="order-item-review-text">
+                                  {itemReview.comment?.trim() || 'No written comment.'}
+                                </p>
+                              </Link>
+                            ) : null}
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
               <div className="row" style={{ justifyContent: 'space-between' }}>
                 <span>Total</span>
                 <strong>{formatMoney(order.total)}</strong>

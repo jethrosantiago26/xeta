@@ -114,6 +114,10 @@ export async function getAdminDashboard() {
   return api.get('/admin/dashboard')
 }
 
+export async function createReview(productSlug, payload) {
+  return api.post(`/products/${productSlug}/reviews`, payload)
+}
+
 export async function getSupportTickets(params = {}) {
   return api.get('/support/tickets', { params })
 }
@@ -177,6 +181,22 @@ export async function updateAdminProductVariant(productId, variantId, payload) {
 
 export async function deleteAdminProductVariant(productId, variantId) {
   return api.delete(`/admin/products/${productId}/variants/${variantId}`)
+}
+
+export async function updateReview(productSlug, reviewId, payload) {
+  return api.put(`/products/${productSlug}/reviews/${reviewId}`, payload)
+}
+
+export async function getAdminReviews(params = {}) {
+  return api.get('/admin/reviews', { params })
+}
+
+export async function updateAdminReview(reviewId, payload) {
+  return api.put(`/admin/reviews/${reviewId}`, payload)
+}
+
+export async function deleteAdminReview(reviewId) {
+  return api.delete(`/admin/reviews/${reviewId}`)
 }
 
 export function readResource(response) {

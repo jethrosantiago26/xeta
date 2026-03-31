@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from '@clerk/clerk-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './components/layout/AppLayout.jsx'
@@ -6,22 +6,35 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { CartProvider } from './context/CartContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'
 import { useSession } from './context/SessionContext.jsx'
-import AccountPage from './pages/AccountPage.jsx'
-import AdminDashboardPage from './pages/AdminDashboardPage.jsx'
-import AdminProductsPage from './pages/AdminProductsPage.jsx'
-import CartPage from './pages/CartPage.jsx'
-import CheckoutPage from './pages/CheckoutPage.jsx'
-import HomePage from './pages/HomePage.jsx'
-import NotFoundPage from './pages/NotFoundPage.jsx'
-import OrdersPage from './pages/OrdersPage.jsx'
-import ProductDetailPage from './pages/ProductDetailPage.jsx'
-import ProductsPage from './pages/ProductsPage.jsx'
-import SettingsPage from './pages/SettingsPage.jsx'
 import SetupPage from './pages/SetupPage.jsx'
-import SupportPage from './pages/SupportPage.jsx'
-import AdminSupportPage from './pages/AdminSupportPage.jsx'
 import { setApiAuthToken, setApiAuthTokenProvider } from './lib/api.js'
 import './App.css'
+
+const AccountPage = lazy(() => import('./pages/AccountPage.jsx'))
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'))
+const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage.jsx'))
+const AdminReviewsPage = lazy(() => import('./pages/AdminReviewsPage.jsx'))
+const AdminSupportPage = lazy(() => import('./pages/AdminSupportPage.jsx'))
+const CartPage = lazy(() => import('./pages/CartPage.jsx'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage.jsx'))
+const FaqPage = lazy(() => import('./pages/FaqPage.jsx'))
+const HomePage = lazy(() => import('./pages/HomePage.jsx'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
+const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'))
+const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage.jsx'))
+const ProductsPage = lazy(() => import('./pages/ProductsPage.jsx'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
+const SupportPage = lazy(() => import('./pages/SupportPage.jsx'))
+
+function RouteLoadingFallback() {
+  return (
+    <div className="page-grid">
+      <section className="content-card">
+        <p className="notice">Loading page...</p>
+      </section>
+    </div>
+  )
+}
 
 function AuthBridge() {
   const { isLoaded, isSignedIn, getToken } = useAuth()
@@ -143,109 +156,127 @@ function App({ clerkReady }) {
     <SessionProvider>
       <CartProvider>
         <AuthBridge />
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route
-              index
-              element={
-                <AdminShoppingRedirect>
-                  <HomePage />
-                </AdminShoppingRedirect>
-              }
-            />
-            <Route
-              path="products"
-              element={
-                <AdminShoppingRedirect>
-                  <ProductsPage />
-                </AdminShoppingRedirect>
-              }
-            />
-            <Route
-              path="products/:slug"
-              element={
-                <AdminShoppingRedirect>
-                  <ProductDetailPage />
-                </AdminShoppingRedirect>
-              }
-            />
-            <Route
-              path="cart"
-              element={
-                <ProtectedRoute disallowAdmin>
-                  <CartPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="checkout"
-              element={
-                <ProtectedRoute disallowAdmin>
-                  <CheckoutPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="orders"
-              element={
-                <ProtectedRoute disallowAdmin>
-                  <OrdersPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="support"
-              element={
-                <ProtectedRoute disallowAdmin>
-                  <SupportPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="account"
-              element={
-                <ProtectedRoute>
-                  <AccountPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <AdminDashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin/products"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <AdminProductsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin/support"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <AdminSupportPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="sign-in" element={<SignInLanding />} />
-            <Route path="post-auth" element={<PostAuthRedirect />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route
+                index
+                element={
+                  <AdminShoppingRedirect>
+                    <HomePage />
+                  </AdminShoppingRedirect>
+                }
+              />
+              <Route
+                path="products"
+                element={
+                  <AdminShoppingRedirect>
+                    <ProductsPage />
+                  </AdminShoppingRedirect>
+                }
+              />
+              <Route
+                path="products/:slug"
+                element={
+                  <AdminShoppingRedirect>
+                    <ProductDetailPage />
+                  </AdminShoppingRedirect>
+                }
+              />
+              <Route
+                path="cart"
+                element={
+                  <ProtectedRoute disallowAdmin>
+                    <CartPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="checkout"
+                element={
+                  <ProtectedRoute disallowAdmin>
+                    <CheckoutPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="orders"
+                element={
+                  <ProtectedRoute disallowAdmin>
+                    <OrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="support"
+                element={
+                  <ProtectedRoute disallowAdmin>
+                    <SupportPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="faq"
+                element={
+                  <ProtectedRoute disallowAdmin>
+                    <FaqPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="account"
+                element={
+                  <ProtectedRoute>
+                    <AccountPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="settings"
+                element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/products"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminProductsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/reviews"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminReviewsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/support"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminSupportPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="sign-in" element={<SignInLanding />} />
+              <Route path="post-auth" element={<PostAuthRedirect />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </CartProvider>
     </SessionProvider>
   )

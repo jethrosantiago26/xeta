@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../context/SessionContext.jsx'
 import { updateProfile } from '../lib/api.js'
-import LocationPickerMap from '../components/LocationPickerMap.jsx'
 import {
   getBrowserCoordinates,
   reverseGeocodeCoordinates,
   searchAddressSuggestions,
 } from '../lib/location.js'
+
+const LocationPickerMap = lazy(() => import('../components/LocationPickerMap.jsx'))
 
 function extractRequestError(error, fallbackMessage) {
   const payload = error?.response?.data
@@ -31,19 +32,7 @@ function parseCoordinate(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function splitFullName(name) {
-  const trimmed = (name || '').trim()
 
-  if (!trimmed) {
-    return { firstName: '', lastName: '' }
-  }
-
-  const parts = trimmed.split(/\s+/)
-  const firstName = parts[0] || ''
-  const lastName = parts.slice(1).join(' ')
-
-  return { firstName, lastName }
-}
 
 function AccountPage() {
   const { profile, refreshProfile } = useSession()
@@ -58,6 +47,7 @@ function AccountPage() {
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
+    username: '',
     phone: '',
     address_line1: '',
     address_line2: '',
@@ -78,14 +68,14 @@ function AccountPage() {
       return
     }
 
-    const { firstName, lastName } = splitFullName(profile.name)
     const mergedAddress = isAdmin
       ? ''
       : [profile.address_line1, profile.address_line2].filter(Boolean).join(', ')
 
     setForm({
-      first_name: firstName,
-      last_name: lastName,
+      first_name: profile.first_name ?? '',
+      last_name: profile.last_name ?? '',
+      username: profile.username ?? '',
       phone: profile.phone ?? '',
       address_line1: mergedAddress,
       address_line2: '',
@@ -220,14 +210,11 @@ function AccountPage() {
   }
 
   async function handleSave() {
-    if (!form.first_name.trim() || !form.last_name.trim()) {
-      setError('First name and last name are required before saving your profile.')
-      setMessage('')
-      return
-    }
+    const firstName = form.first_name.trim()
+    const lastName = form.last_name.trim()
 
-    if (form.first_name.trim().toLowerCase() === form.last_name.trim().toLowerCase()) {
-      setError('First name and last name must be different.')
+    if (!firstName) {
+      setError('First name is required before saving your profile.')
       setMessage('')
       return
     }
@@ -239,11 +226,13 @@ function AccountPage() {
     try {
       const latitudeValue = form.latitude === '' ? null : Number(form.latitude)
       const longitudeValue = form.longitude === '' ? null : Number(form.longitude)
-      const fullName = `${form.first_name.trim()} ${form.last_name.trim()}`
+      const fullName = [firstName, lastName].filter(Boolean).join(' ')
 
       await updateProfile({
         ...form,
         name: fullName,
+        first_name: firstName,
+        last_name: lastName,
         address_line1: isAdmin ? '' : form.address_line1.trim(),
         address_line2: '',
         city: isAdmin ? '' : form.city,
@@ -331,35 +320,66 @@ function AccountPage() {
             <div className="section-rule" aria-hidden="true" />
           </div>
 
-          <div className="field-grid account-grid account-grid-vertical">
-            <select
-              className="select"
-              value={form.preferred_contact_method}
-              onChange={(event) =>
-                setForm({ ...form, preferred_contact_method: event.target.value })
-              }
-            >
-              <option value="email">Preferred Contact: E-mail</option>
-              <option value="phone">Preferred Contact: Phone</option>
-            </select>
-            <input
-              className="input"
-              placeholder="First name"
-              value={form.first_name}
-              onChange={(event) => setForm({ ...form, first_name: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Last name"
-              value={form.last_name}
-              onChange={(event) => setForm({ ...form, last_name: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Phone number"
-              value={form.phone}
-              onChange={(event) => setForm({ ...form, phone: event.target.value })}
-            />
+          <div className="field-grid account-grid account-grid-vertical" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="stack" style={{ gap: '5px' }}>
+              <label className="caption">Preferred Contact Method</label>
+              <select
+                className="select"
+                value={form.preferred_contact_method}
+                onChange={(event) =>
+                  setForm({ ...form, preferred_contact_method: event.target.value })
+                }
+              >
+                <option value="email">E-mail</option>
+                <option value="phone">Phone</option>
+              </select>
+            </div>
+            <div className="account-grid account-grid-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div className="stack" style={{ gap: '5px' }}>
+                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  First name <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+                </label>
+                <input
+                  className="input input-readonly"
+                  readOnly
+                  placeholder="First name"
+                  value={form.first_name}
+                />
+              </div>
+              <div className="stack" style={{ gap: '5px' }}>
+                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  Last name <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+                </label>
+                <input
+                  className="input input-readonly"
+                  readOnly
+                  placeholder="Last name"
+                  value={form.last_name}
+                />
+              </div>
+            </div>
+
+            <div className="stack" style={{ gap: '5px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Username <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+              </label>
+              <input
+                className="input input-readonly"
+                readOnly
+                placeholder="Username"
+                value={form.username}
+              />
+            </div>
+
+            <div className="stack" style={{ gap: '5px' }}>
+              <label className="caption">Phone number</label>
+              <input
+                className="input"
+                placeholder="Phone number"
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+              />
+            </div>
             {!isAdmin ? (
               <div className="account-address-autocomplete">
                 <input
@@ -418,11 +438,13 @@ function AccountPage() {
               <p className="caption" style={{ margin: 0 }}>
                 Map picker: click any point to fill city, country, and coordinates.
               </p>
-              <LocationPickerMap
-                latitude={hasMapPosition ? parsedLatitude : undefined}
-                longitude={hasMapPosition ? parsedLongitude : undefined}
-                onSelect={handleMapSelect}
-              />
+              <Suspense fallback={<div className="notice">Loading map...</div>}>
+                <LocationPickerMap
+                  latitude={hasMapPosition ? parsedLatitude : undefined}
+                  longitude={hasMapPosition ? parsedLongitude : undefined}
+                  onSelect={handleMapSelect}
+                />
+              </Suspense>
             </div>
           ) : null}
 

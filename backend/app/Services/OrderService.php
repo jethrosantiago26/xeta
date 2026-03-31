@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class OrderService
 {
+    private const ORDER_RELATIONS = ['items.variant.product.images'];
+
     public function __construct(
         private readonly CartService $cartService,
     ) {}
@@ -71,7 +73,7 @@ class OrderService
                 'user_id' => $user->id,
             ]);
 
-            return $order->load('items');
+            return $order->load(self::ORDER_RELATIONS);
         });
     }
 
@@ -96,7 +98,10 @@ class OrderService
     public function getUserOrders(User $user, int $perPage = 10)
     {
         return $user->orders()
-            ->with('items')
+            ->with([
+                ...self::ORDER_RELATIONS,
+                'items.variant.product.reviews' => fn ($query) => $query->where('user_id', $user->id),
+            ])
             ->orderByDesc('created_at')
             ->paginate($perPage);
     }
@@ -106,7 +111,7 @@ class OrderService
      */
     public function getAllOrders(?string $status = null, int $perPage = 20)
     {
-        $query = Order::with(['user', 'items'])->orderByDesc('created_at');
+        $query = Order::with(['user', ...self::ORDER_RELATIONS])->orderByDesc('created_at');
 
         if ($status) {
             $query->where('status', $status);

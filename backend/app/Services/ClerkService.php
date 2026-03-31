@@ -77,12 +77,33 @@ class ClerkService
     {
         $clerkId = $claims->sub;
         $email = $this->resolveEmailAddress($claims);
+        $firstName = $claims->first_name ?? null;
+        $lastName = $claims->last_name ?? null;
+        $claimName = trim(($firstName ?? '') . ' ' . ($lastName ?? '')) ?: null;
+        $username = $claims->username ?? null;
         $allowedAdminEmails = array_map('strtolower', config('admin.emails', []));
         $isAdminEmail = $email && in_array(strtolower($email), $allowedAdminEmails, true);
-        $claimName = trim(($claims->first_name ?? '') . ' ' . ($claims->last_name ?? '')) ?: null;
+
+        if (!$username || !$email || !$firstName) {
+            $clerkUser = $this->fetchUserFromClerkApi($clerkId);
+            $username = $username ?: ($clerkUser['username'] ?? null);
+            $firstName = $firstName ?: ($clerkUser['first_name'] ?? null);
+            $lastName = $lastName ?: ($clerkUser['last_name'] ?? null);
+            
+            if (!$email) {
+                $email = $this->resolveEmailFromApiData($clerkUser);
+            }
+
+            if (!$claimName) {
+                $claimName = trim(($firstName ?? '') . ' ' . ($lastName ?? '')) ?: 'User';
+            }
+        }
 
         $userData = [
             'email' => $email,
+            'username' => $username,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'role' => $isAdminEmail ? 'admin' : 'customer',
         ];
 
@@ -136,29 +157,14 @@ class ClerkService
             }
         }
 
-        return $this->fetchEmailFromClerkApi($claims->sub);
+        return null;
     }
 
     /**
-     * Fallback to the Clerk API when the JWT does not expose an email address.
+     * Resolve email from Clerk API user data.
      */
-    private function fetchEmailFromClerkApi(string $clerkId): ?string
+    private function resolveEmailFromApiData(array $userData): ?string
     {
-        $secretKey = config('clerk.secret_key');
-
-        if (!$secretKey) {
-            return null;
-        }
-
-        $response = Http::withToken($secretKey)
-            ->timeout(10)
-            ->get("https://api.clerk.com/v1/users/{$clerkId}");
-
-        if (!$response->successful()) {
-            return null;
-        }
-
-        $userData = $response->json();
         $emailAddresses = $userData['email_addresses'] ?? [];
         $primaryEmailAddressId = $userData['primary_email_address_id'] ?? null;
 
@@ -175,5 +181,25 @@ class ClerkService
         }
 
         return null;
+    }
+
+    /**
+     * Fetch the full User data from the Clerk API.
+     */
+    private function fetchUserFromClerkApi(string $clerkId): array
+    {
+        $secretKey = config('clerk.secret_key');
+
+        if (!$secretKey) {
+            return [];
+        }
+
+        return Cache::remember("clerk_user_{$clerkId}", 3600, function () use ($secretKey, $clerkId) {
+            $response = Http::withToken($secretKey)
+                ->timeout(10)
+                ->get("https://api.clerk.com/v1/users/{$clerkId}");
+
+            return $response->successful() ? $response->json() : [];
+        });
     }
 }

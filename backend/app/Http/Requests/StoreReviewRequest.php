@@ -15,8 +15,10 @@ class StoreReviewRequest extends FormRequest
     {
         return [
             'order_id' => ['required', 'exists:orders,id'],
+            'variant_id' => ['required', 'exists:product_variants,id'],
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
             'comment' => ['nullable', 'string', 'max:2000'],
+            'is_anonymous' => ['nullable', 'boolean'],
         ];
     }
 }

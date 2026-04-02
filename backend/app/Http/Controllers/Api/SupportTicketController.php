@@ -11,6 +11,8 @@ use App\Models\SupportTicket;
 use App\Services\SupportTicketService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class SupportTicketController extends Controller
 {
@@ -36,7 +38,13 @@ class SupportTicketController extends Controller
      */
     public function store(StoreSupportTicketRequest $request): SupportTicketResource
     {
-        $ticket = $this->supportTicketService->createTicket($request->user(), $request->validated());
+        $imageUrl = $this->storeUploadedImage($request);
+
+        $ticket = $this->supportTicketService->createTicket(
+            $request->user(),
+            $request->validated(),
+            $imageUrl,
+        );
 
         return new SupportTicketResource($ticket->load(['user']));
     }
@@ -63,13 +71,65 @@ class SupportTicketController extends Controller
             ->supportTickets()
             ->findOrFail($ticket);
 
+        $imageUrl = $this->storeUploadedImage($request);
+        $messageText = $request->validated('message') ?? '';
+
+        // Ensure at least image or message is present
+        if (empty(trim($messageText)) && !$imageUrl) {
+            throw ValidationException::withMessages([
+                'message' => ['A message or image is required.'],
+            ]);
+        }
+
         $message = $this->supportTicketService->addMessage(
             $ticketModel,
             $request->user(),
-            $request->validated('message'),
-            'customer'
+            $messageText ?: '📷 Image attached',
+            'customer',
+            true,
+            $imageUrl,
         );
 
         return new SupportMessageResource($message);
+    }
+
+    /**
+     * Reopen a closed or resolved support ticket.
+     */
+    public function reopen(Request $request, int $ticket)
+    {
+        $ticketModel = $request->user()
+            ->supportTickets()
+            ->findOrFail($ticket);
+
+        if ($ticketModel->status !== 'resolved' && $ticketModel->status !== 'closed') {
+            return response()->json(['message' => 'Only resolved or closed tickets can be reopened.'], 422);
+        }
+
+        $this->supportTicketService->updateTicket($ticketModel, ['status' => 'open'], $request->user());
+
+        $this->supportTicketService->addMessage(
+            $ticketModel,
+            $request->user(),
+            'Ticket reopened by customer.',
+            'system',
+            true
+        );
+
+        return new SupportTicketResource($ticketModel->refresh());
+    }
+
+    /**
+     * Store an uploaded image to the public disk and return the URL.
+     */
+    private function storeUploadedImage(Request $request): ?string
+    {
+        if (!$request->hasFile('image') || !$request->file('image')->isValid()) {
+            return null;
+        }
+
+        $path = $request->file('image')->store('support-attachments', 'public');
+
+        return '/storage/' . $path;
     }
 }

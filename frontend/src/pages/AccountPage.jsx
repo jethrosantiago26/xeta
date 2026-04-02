@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../context/SessionContext.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 import { updateProfile } from '../lib/api.js'
 import {
   getBrowserCoordinates,
@@ -34,9 +35,39 @@ function parseCoordinate(value) {
 
 
 
+const SETTINGS_STORAGE_KEY = 'xeta:user-settings:v1'
+
+const defaultSettings = {
+  order_updates: true,
+  security_alerts: true,
+  marketing_emails: false,
+  profile_visibility: 'private',
+}
+
 function AccountPage() {
+  const { theme, setTheme, toggleTheme } = useTheme()
   const { profile, refreshProfile } = useSession()
   const isAdmin = profile?.role === 'admin'
+  const [activeTab, setActiveTab] = useState('profile')
+  
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY)
+    if (!saved) return defaultSettings
+    try {
+      const parsed = JSON.parse(saved)
+      return { ...defaultSettings, ...parsed }
+    } catch {
+      return defaultSettings
+    }
+  })
+  const [settingsMessage, setSettingsMessage] = useState('')
+
+  function handleSaveSettings() {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    setSettingsMessage('Settings saved.')
+    setTimeout(() => setSettingsMessage(''), 3000)
+  }
+
   const [loading, setLoading] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
   const [addressSearching, setAddressSearching] = useState(false)
@@ -68,17 +99,13 @@ function AccountPage() {
       return
     }
 
-    const mergedAddress = isAdmin
-      ? ''
-      : [profile.address_line1, profile.address_line2].filter(Boolean).join(', ')
-
     setForm({
       first_name: profile.first_name ?? '',
       last_name: profile.last_name ?? '',
       username: profile.username ?? '',
       phone: profile.phone ?? '',
-      address_line1: mergedAddress,
-      address_line2: '',
+      address_line1: isAdmin ? '' : (profile.address_line1 ?? ''),
+      address_line2: isAdmin ? '' : (profile.address_line2 ?? ''),
       city: profile.city ?? '',
       state: profile.state ?? '',
       postal_code: profile.postal_code ?? '',
@@ -234,7 +261,7 @@ function AccountPage() {
         first_name: firstName,
         last_name: lastName,
         address_line1: isAdmin ? '' : form.address_line1.trim(),
-        address_line2: '',
+        address_line2: isAdmin ? '' : form.address_line2.trim(),
         city: isAdmin ? '' : form.city,
         state: isAdmin ? '' : form.state,
         postal_code: isAdmin ? '' : form.postal_code,
@@ -256,16 +283,38 @@ function AccountPage() {
   return (
     <div className="page-grid account-page">
       <section className="content-card account-hero">
-        <div className="section-label account-hero-heading">
+        <div className="section-label account-hero-heading" style={{ marginBottom: '16px' }}>
           <div>
             <p className="eyebrow-inline">Account</p>
-            <h1>Your profile</h1>
+            <h1>Your dashboard</h1>
           </div>
         </div>
-        <p className="muted">
-          Clerk identity is synchronized into Laravel users, and the profile form stores
-          the personal details needed for checkout, shipping, and support.
-        </p>
+        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--color-border)', paddingBottom: '0px' }}>
+          <button 
+            className={`tab-link ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+            style={{ 
+              background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
+              color: activeTab === 'profile' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              borderBottom: activeTab === 'profile' ? '2px solid var(--color-primary)' : '2px solid transparent',
+              fontWeight: 600, fontSize: '0.9rem'
+            }}
+          >
+            Profile
+          </button>
+          <button 
+            className={`tab-link ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+            style={{ 
+              background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
+              color: activeTab === 'settings' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              borderBottom: activeTab === 'settings' ? '2px solid var(--color-primary)' : '2px solid transparent',
+              fontWeight: 600, fontSize: '0.9rem'
+            }}
+          >
+            Preferences & Settings
+          </button>
+        </div>
       </section>
 
       <section className="account-layout">
@@ -311,14 +360,15 @@ function AccountPage() {
           ) : null}
         </aside>
 
-        <section className="content-card account-form-card">
-          <div className="section-label">
-            <div>
-              <p className="eyebrow-inline">Personal details</p>
-              <h2>{isAdmin ? 'Profile information' : 'Billing, shipping, and contact information'}</h2>
+        {activeTab === 'profile' ? (
+          <section className="content-card account-form-card">
+            <div className="section-label">
+              <div>
+                <p className="eyebrow-inline">Personal details</p>
+                <h2>{isAdmin ? 'Profile information' : 'Billing, shipping, and contact information'}</h2>
+              </div>
+              <div className="section-rule" aria-hidden="true" />
             </div>
-            <div className="section-rule" aria-hidden="true" />
-          </div>
 
           <div className="field-grid account-grid account-grid-vertical" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="stack" style={{ gap: '5px' }}>
@@ -415,6 +465,18 @@ function AccountPage() {
                 ) : null}
               </div>
             ) : null}
+
+            {!isAdmin ? (
+              <div className="stack" style={{ gap: '5px' }}>
+                <label className="caption">Address line 2</label>
+                <input
+                  className="input"
+                  placeholder="Floor, suite, apt (optional)"
+                  value={form.address_line2}
+                  onChange={(event) => setForm({ ...form, address_line2: event.target.value })}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="actions account-actions">
@@ -448,9 +510,81 @@ function AccountPage() {
             </div>
           ) : null}
 
-          {message ? <div className="notice">{message}</div> : null}
-          {error ? <div className="notice error">{error}</div> : null}
-        </section>
+            {message ? <div className="notice">{message}</div> : null}
+            {error ? <div className="notice error">{error}</div> : null}
+          </section>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+            <article className="content-card settings-card">
+              <h3>Appearance</h3>
+              <p className="muted">Use an Apple-style adaptive theme across the app shell.</p>
+              <div className="field-grid settings-grid">
+                <select
+                  className="select"
+                  value={theme}
+                  onChange={(event) => setTheme(event.target.value)}
+                >
+                  <option value="dark">Dark mode</option>
+                  <option value="light">Light mode</option>
+                </select>
+                <button type="button" className="button button-secondary" onClick={toggleTheme}>
+                  Toggle theme
+                </button>
+              </div>
+            </article>
+
+            <article className="content-card settings-card">
+              <h3>Notifications</h3>
+              <div className="stack" style={{ gap: '10px' }}>
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={settings.order_updates}
+                    onChange={(event) => setSettings({ ...settings, order_updates: event.target.checked })}
+                  />
+                  <span>Order updates</span>
+                </label>
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={settings.security_alerts}
+                    onChange={(event) => setSettings({ ...settings, security_alerts: event.target.checked })}
+                  />
+                  <span>Security alerts</span>
+                </label>
+                <label className="settings-check">
+                  <input
+                    type="checkbox"
+                    checked={settings.marketing_emails}
+                    onChange={(event) => setSettings({ ...settings, marketing_emails: event.target.checked })}
+                  />
+                  <span>Marketing emails</span>
+                </label>
+              </div>
+            </article>
+
+            <article className="content-card settings-card">
+              <h3>Privacy</h3>
+              <p className="muted">Control how your account appears in shared experiences.</p>
+              <select
+                className="select"
+                value={settings.profile_visibility}
+                onChange={(event) => setSettings({ ...settings, profile_visibility: event.target.value })}
+              >
+                <option value="private">Profile visibility: private</option>
+                <option value="friends">Profile visibility: friends</option>
+                <option value="public">Profile visibility: public</option>
+              </select>
+            </article>
+
+            <section className="content-card settings-actions">
+              <button type="button" className="button button-primary" onClick={handleSaveSettings}>
+                Save settings
+              </button>
+              {settingsMessage ? <div className="notice success">{settingsMessage}</div> : null}
+            </section>
+          </div>
+        )}
       </section>
     </div>
   )

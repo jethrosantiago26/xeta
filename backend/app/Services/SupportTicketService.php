@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 class SupportTicketService
 {
-    public function createTicket(User $user, array $payload): SupportTicket
+    public function createTicket(User $user, array $payload, ?string $imageUrl = null): SupportTicket
     {
         $ticket = SupportTicket::create([
             'user_id' => $user->id,
@@ -26,7 +26,15 @@ class SupportTicketService
             'last_reply_at' => Carbon::now(),
         ]);
 
-        $this->addMessage($ticket, $user, $payload['message'], 'customer', false);
+        $this->addMessage($ticket, $user, $payload['message'], 'customer', false, $imageUrl);
+
+        $this->addMessage(
+            $ticket,
+            $user, // A system user isn't strictly necessary since we have author_role = system
+            "Thank you for reaching out. Please wait while a support agent reviews your ticket. We'll be with you shortly.",
+            'system',
+            false
+        );
 
         $this->notifySupportInbox($ticket, $payload['message']);
         $this->notifyCustomer($ticket, $user, 'We received your support request.', $payload['message']);
@@ -40,23 +48,23 @@ class SupportTicketService
         string $message,
         string $role,
         bool $sendEmail = true,
+        ?string $imageUrl = null,
     ): SupportMessage {
         $record = SupportMessage::create([
             'ticket_id' => $ticket->id,
             'user_id' => $user->id,
             'author_role' => $role,
             'message' => $message,
+            'image_url' => $imageUrl,
         ]);
 
         $ticket->last_reply_at = Carbon::now();
 
-        if ($role === 'admin' && $ticket->status !== 'resolved' && $ticket->status !== 'closed') {
-            $ticket->status = 'waiting_customer';
-        }
-
-        if ($role === 'customer' && $ticket->status === 'waiting_customer') {
+        if ($role === 'admin' && $ticket->status === 'open') {
             $ticket->status = 'in_progress';
         }
+
+        // We can just omit the customer change to let it stay in_progress automatically.
 
         if ($ticket->isDirty()) {
             $ticket->save();

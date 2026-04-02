@@ -16,6 +16,49 @@ function formatRatingStars(ratingValue) {
   return `${'★'.repeat(safeRating)}${'☆'.repeat(5 - safeRating)}`
 }
 
+function OrderTracker({ currentStatus, createdOn }) {
+  const steps = ['pending', 'processing', 'shipped', 'delivered']
+  
+  if (currentStatus === 'cancelled') {
+    return (
+      <div className="order-tracker-cancelled">
+        <span className="pill pill-error">Cancelled</span>
+      </div>
+    )
+  }
+
+  const statusMap = {
+    pending: 'Order Placed',
+    processing: 'Processing',
+    shipped: 'Shipped',
+    delivered: 'Delivered'
+  }
+
+  const currentIndex = steps.indexOf(currentStatus)
+  
+  return (
+    <div className="order-tracker">
+      {steps.map((step, idx) => {
+        const isActive = idx <= currentIndex
+        const isLast = idx === steps.length - 1
+        
+        return (
+          <div key={step} className={`tracker-step ${isActive ? 'active' : ''} ${isLast ? 'last' : ''}`}>
+            <div className="tracker-line-container">
+              <div className="tracker-dot"></div>
+              {!isLast && <div className="tracker-line"></div>}
+            </div>
+            <div className="tracker-content">
+              <span className="tracker-label">{statusMap[step]}</span>
+              {step === 'pending' && <span className="tracker-date">{new Date(createdOn).toLocaleDateString()}</span>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function OrdersPage() {
   const { isLoaded, isSignedIn, loading: sessionLoading } = useSession()
   const [orders, setOrders] = useState([])
@@ -123,18 +166,19 @@ function OrdersPage() {
         ) : (
           orders.map((order) => (
             <article key={order.id} className="content-card">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
+              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <h3>{order.order_number}</h3>
-                  <p className="muted">Placed on {new Date(order.created_at).toLocaleString()}</p>
+                  <h3 style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>{order.order_number}</h3>
+                  <p className="muted" style={{ margin: 0, fontSize: '0.875rem' }}>
+                    {order.items?.length || 0} items for {formatMoney(order.total)}
+                  </p>
                 </div>
-                <span className="status-pill">{order.status}</span>
+                {/* Visual Tracker renders on the right side on desktop or stacks on mobile */}
+              </div>
+              <div style={{ marginTop: '24px', marginBottom: '8px' }}>
+                <OrderTracker currentStatus={order.status} createdOn={order.created_at} />
               </div>
               <div className="divider" />
-              <div className="order-card-summary row" style={{ justifyContent: 'space-between' }}>
-                <span>{(order.items ?? []).length} item{(order.items ?? []).length === 1 ? '' : 's'}</span>
-                <strong>{formatMoney(order.total)}</strong>
-              </div>
               <div className="order-items-panel">
                 <p className="muted order-items-heading">Products in this order</p>
                 <div className="order-items-scroll">

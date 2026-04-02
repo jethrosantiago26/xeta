@@ -62,12 +62,10 @@ function AppLayout() {
     { to: '/admin/customers', label: 'Customers', note: 'Segmentation and support' },
     { to: '/admin/inventory', label: 'Inventory', note: 'Stock and low-level alerts' },
     { to: '/admin/reviews', label: 'Reviews', note: 'Moderation pipeline' },
-    { to: '/admin/analytics', label: 'Analytics', note: 'Revenue and conversion' },
   ]
 
   const adminSystemMenu = [
-    { to: '/account', label: 'Profile' },
-    { to: '/settings', label: 'Settings' },
+    { to: '/account', label: 'My Account' },
   ]
 
   function closeShopMenu() {
@@ -166,27 +164,17 @@ function AppLayout() {
 
             <div className="admin-sidebar-group">
               <p className="admin-sidebar-title">Commerce</p>
-              {adminCommerceMenu.map((item) => {
-                if (!item.to || item.to.includes('customers') || item.to.includes('inventory') || item.to.includes('analytics') || item.to.includes('orders')) {
-                  return (
-                    <div key={item.label} className="admin-side-link disabled" aria-disabled="true">
-                      <span>{item.label}</span>
-                      <small>{item.note}</small>
-                    </div>
-                  )
-                }
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
-                  >
-                    <span>{item.label}</span>
-                    <small>{item.note}</small>
-                  </NavLink>
-                )
-              })}
+              {adminCommerceMenu.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+                >
+                  <span>{item.label}</span>
+                  <small>{item.note}</small>
+                </NavLink>
+              ))}
             </div>
 
             <div className="admin-sidebar-group">
@@ -406,18 +394,15 @@ function AppLayout() {
                     }}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                      <path d="m19.4 12.9-.2-1.8 1.6-1.3-1.7-2.9-2 .6-1.4-1-1.1-1.8h-3.2L10.3 6l-1.4 1-2-.6-1.7 2.9 1.6 1.3-.2 1.8-1.4 1.2 1.7 2.9 1.9-.5 1.5 1.1 1 1.7h3.2l1-1.7 1.5-1.1 1.9.5 1.7-2.9-1.4-1.2Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09A1.65 1.65 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.75" />
                     </svg>
                   </button>
 
                   {settingsOpen ? (
                     <div className="settings-dropdown-menu" role="menu" aria-label="Settings">
-                      <NavLink className="settings-dropdown-item" to="/settings" role="menuitem" onClick={closeSettingsMenu}>
-                        Settings
-                      </NavLink>
                       <NavLink className="settings-dropdown-item" to="/account" role="menuitem" onClick={closeSettingsMenu}>
-                        Profile
+                        Account Dashboard
                       </NavLink>
                     </div>
                   ) : null}

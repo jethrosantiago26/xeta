@@ -31,27 +31,35 @@ api.interceptors.response.use(
     }
 
     if (!authTokenProvider) {
+      console.warn('[API Interceptor] 401 received but no authTokenProvider set.')
       return Promise.reject(error)
     }
 
     originalRequest.__retriedWithFreshToken = true
 
     try {
+      console.debug('[API Interceptor] 401 received. Refreshing token...')
       const freshToken = await authTokenProvider()
 
       if (!freshToken) {
+        console.warn('[API Interceptor] Failed to refresh token. Clearing local auth.')
         setApiAuthToken(null)
         return Promise.reject(error)
       }
 
+      console.debug('[API Interceptor] Token refreshed. Retrying request...')
       setApiAuthToken(freshToken)
-      originalRequest.headers = {
-        ...(originalRequest.headers || {}),
-        Authorization: `Bearer ${freshToken}`,
+
+      // Ensure compatibility with Axios 1.x AxiosHeaders object
+      if (originalRequest.headers.set) {
+        originalRequest.headers.set('Authorization', `Bearer ${freshToken}`)
+      } else {
+        originalRequest.headers.Authorization = `Bearer ${freshToken}`
       }
 
       return api.request(originalRequest)
-    } catch {
+    } catch (refreshError) {
+      console.error('[API Interceptor] Error during token refresh/retry:', refreshError)
       setApiAuthToken(null)
       return Promise.reject(error)
     }
@@ -134,6 +142,10 @@ export async function createSupportMessage(ticketId, payload) {
   return api.post(`/support/tickets/${ticketId}/messages`, payload)
 }
 
+export async function reopenSupportTicket(ticketId) {
+  return api.post(`/support/tickets/${ticketId}/reopen`)
+}
+
 export async function getAdminSupportTickets(params = {}) {
   return api.get('/admin/support/tickets', { params })
 }
@@ -164,6 +176,14 @@ export async function updateAdminProduct(productId, payload) {
 
 export async function deleteAdminProduct(productId) {
   return api.delete(`/admin/products/${productId}`)
+}
+
+export async function restoreAdminProduct(productId) {
+  return api.post(`/admin/products/${productId}/restore`)
+}
+
+export async function forceDeleteAdminProduct(productId) {
+  return api.delete(`/admin/products/${productId}/force`)
 }
 
 export async function createAdminProductVariant(productId, payload) {
@@ -199,8 +219,82 @@ export async function deleteAdminReview(reviewId) {
   return api.delete(`/admin/reviews/${reviewId}`)
 }
 
+export async function restoreAdminReview(reviewId) {
+  return api.post(`/admin/reviews/${reviewId}/restore`)
+}
+
+export async function forceDeleteAdminReview(reviewId) {
+  return api.delete(`/admin/reviews/${reviewId}/force`)
+}
+
+export async function getAdminOrders(params = {}) {
+  return api.get('/admin/orders', { params })
+}
+
+export async function updateAdminOrder(orderId, payload) {
+  return api.put(`/admin/orders/${orderId}`, payload)
+}
+
+export async function deleteAdminOrder(orderId) {
+  return api.delete(`/admin/orders/${orderId}`)
+}
+
+export async function restoreAdminOrder(orderId) {
+  return api.post(`/admin/orders/${orderId}/restore`)
+}
+
+export async function forceDeleteAdminOrder(orderId) {
+  return api.delete(`/admin/orders/${orderId}/force`)
+}
+
+export async function bulkAdminOrdersAction(payload) {
+  return api.post('/admin/orders/bulk', payload)
+}
+
+export async function getAdminCustomers(params = {}) {
+  return api.get('/admin/customers', { params })
+}
+
+export async function updateAdminCustomer(customerId, payload) {
+  return api.put(`/admin/customers/${customerId}`, payload)
+}
+
+export async function deleteAdminCustomer(customerId) {
+  return api.delete(`/admin/customers/${customerId}`)
+}
+
+export async function restoreAdminCustomer(customerId) {
+  return api.post(`/admin/customers/${customerId}/restore`)
+}
+
+export async function forceDeleteAdminCustomer(customerId) {
+  return api.delete(`/admin/customers/${customerId}/force`)
+}
+
+export async function getAdminInventory(params = {}) {
+  return api.get('/admin/inventory', { params })
+}
+
+export async function updateAdminInventoryStock(variantId, payload) {
+  return api.put(`/admin/inventory/variants/${variantId}/stock`, payload)
+}
+
+export async function getAdminAnalytics(params = {}) {
+  return api.get('/admin/analytics', { params })
+}
+
 export function readResource(response) {
   return response.data
+}
+
+export function getAssetUrl(path) {
+  if (!path) return path
+  if (path.startsWith('http://') || path.startsWith('https://')) return path
+  if (path.startsWith('/')) {
+    const baseUrl = api.defaults.baseURL.replace('/api/v1', '')
+    return `${baseUrl}${path}`
+  }
+  return path
 }
 
 export default api

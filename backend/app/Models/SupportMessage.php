@@ -12,6 +12,7 @@ class SupportMessage extends Model
         'user_id',
         'author_role',
         'message',
+        'image_url',
     ];
 
     public function ticket(): BelongsTo

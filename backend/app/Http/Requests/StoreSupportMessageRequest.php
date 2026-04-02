@@ -14,7 +14,8 @@ class StoreSupportMessageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'message' => ['required', 'string', 'min:2'],
+            'message' => ['required_without:image', 'nullable', 'string', 'min:2'],
+            'image' => ['nullable', 'image', 'max:5120'], // 5MB max
         ];
     }
 }

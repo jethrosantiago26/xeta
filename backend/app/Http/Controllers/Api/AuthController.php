@@ -24,9 +24,12 @@ class AuthController extends Controller
     public function sync(Request $request): JsonResponse
     {
         // User is already synced by ClerkAuthenticate middleware
+        $user = $request->user()->refresh();
+
         return response()->json([
-            'message' => 'User synced',
-            'user' => new UserResource($request->user()),
+            'status' => 'success',
+            'message' => 'User account synchronized with Clerk',
+            'data' => new UserResource($user),
         ]);
     }
 

@@ -11,10 +11,14 @@ import { setApiAuthToken, setApiAuthTokenProvider } from './lib/api.js'
 import './App.css'
 
 const AccountPage = lazy(() => import('./pages/AccountPage.jsx'))
-const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage.jsx'))
+
 const AdminProductsPage = lazy(() => import('./pages/AdminProductsPage.jsx'))
 const AdminReviewsPage = lazy(() => import('./pages/AdminReviewsPage.jsx'))
 const AdminSupportPage = lazy(() => import('./pages/AdminSupportPage.jsx'))
+const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage.jsx'))
+const AdminCustomersPage = lazy(() => import('./pages/AdminCustomersPage.jsx'))
+const AdminInventoryPage = lazy(() => import('./pages/AdminInventoryPage.jsx'))
+const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage.jsx'))
 const CartPage = lazy(() => import('./pages/CartPage.jsx'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage.jsx'))
 const FaqPage = lazy(() => import('./pages/FaqPage.jsx'))
@@ -23,7 +27,6 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage.jsx'))
 const ProductsPage = lazy(() => import('./pages/ProductsPage.jsx'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
 const SupportPage = lazy(() => import('./pages/SupportPage.jsx'))
 
 function RouteLoadingFallback() {
@@ -231,19 +234,12 @@ function App({ clerkReady }) {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="settings"
-                element={
-                  <ProtectedRoute>
-                    <SettingsPage />
-                  </ProtectedRoute>
-                }
-              />
+
               <Route
                 path="admin"
                 element={
                   <ProtectedRoute requireAdmin>
-                    <AdminDashboardPage />
+                    <AdminAnalyticsPage />
                   </ProtectedRoute>
                 }
               />
@@ -268,6 +264,38 @@ function App({ clerkReady }) {
                 element={
                   <ProtectedRoute requireAdmin>
                     <AdminSupportPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/orders"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/customers"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminCustomersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/inventory"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminInventoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/analytics"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminAnalyticsPage />
                   </ProtectedRoute>
                 }
               />

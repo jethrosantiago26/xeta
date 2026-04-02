@@ -109,9 +109,13 @@ class OrderService
     /**
      * Get all orders (admin), optionally filtered by status.
      */
-    public function getAllOrders(?string $status = null, int $perPage = 20)
+    public function getAllOrders(?string $status = null, int $perPage = 20, bool $withArchived = false)
     {
         $query = Order::with(['user', ...self::ORDER_RELATIONS])->orderByDesc('created_at');
+
+        if ($withArchived) {
+            $query->withTrashed();
+        }
 
         if ($status) {
             $query->where('status', $status);

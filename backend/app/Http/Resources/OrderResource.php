@@ -21,7 +21,9 @@ class OrderResource extends JsonResource
             'shipping_address' => $this->shipping_address,
             'items' => OrderItemResource::collection($this->whenLoaded('items')),
             'paid_at' => $this->paid_at,
+            'user' => new UserResource($this->whenLoaded('user')),
             'created_at' => $this->created_at,
+            'deleted_at' => $this->deleted_at,
         ];
     }
 }

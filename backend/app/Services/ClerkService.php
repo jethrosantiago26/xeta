@@ -58,15 +58,27 @@ class ClerkService
         return Cache::remember('clerk_jwks', $cacheTtl, function () {
             $jwksUrl = config('clerk.jwks_url');
 
-            Log::info('Fetching Clerk JWKS', ['url' => $jwksUrl]);
+            Log::debug('Attempting to fetch Clerk JWKS', ['url' => $jwksUrl]);
 
-            $response = Http::timeout(10)->get($jwksUrl);
+            try {
+                $response = Http::timeout(3)->get($jwksUrl);
 
-            if (!$response->successful()) {
-                throw new \RuntimeException('Failed to fetch Clerk JWKS');
+                if (!$response->successful()) {
+                    Log::error('Failed to fetch Clerk JWKS', [
+                        'url' => $jwksUrl,
+                        'status' => $response->status(),
+                    ]);
+                    throw new \RuntimeException("Failed to fetch Clerk JWKS (Status: {$response->status()})");
+                }
+
+                return $response->json();
+            } catch (\Exception $e) {
+                Log::error('Clerk JWKS network error', [
+                    'url' => $jwksUrl,
+                    'message' => $e->getMessage(),
+                ]);
+                throw $e;
             }
-
-            return $response->json();
         });
     }
 
@@ -81,8 +93,6 @@ class ClerkService
         $lastName = $claims->last_name ?? null;
         $claimName = trim(($firstName ?? '') . ' ' . ($lastName ?? '')) ?: null;
         $username = $claims->username ?? null;
-        $allowedAdminEmails = array_map('strtolower', config('admin.emails', []));
-        $isAdminEmail = $email && in_array(strtolower($email), $allowedAdminEmails, true);
 
         if (!$username || !$email || !$firstName) {
             $clerkUser = $this->fetchUserFromClerkApi($clerkId);
@@ -98,6 +108,10 @@ class ClerkService
                 $claimName = trim(($firstName ?? '') . ' ' . ($lastName ?? '')) ?: 'User';
             }
         }
+
+        // Re-calculate admin status after email is fully resolved (either from claims or API).
+        $allowedAdminEmails = array_map('strtolower', config('admin.emails', []));
+        $isAdminEmail = $email && in_array(strtolower($email), $allowedAdminEmails, true);
 
         $userData = [
             'email' => $email,

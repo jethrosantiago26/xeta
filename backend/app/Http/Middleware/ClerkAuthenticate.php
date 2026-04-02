@@ -29,12 +29,16 @@ class ClerkAuthenticate
             $request->setUserResolver(fn () => $user);
         } catch (\Exception $e) {
             Log::warning('Clerk authentication failed', [
-                'token_prefix' => substr($token, 0, 20),
+                'url' => $request->fullUrl(),
+                'token_prefix' => substr($token, 0, 10),
                 'error' => $e->getMessage(),
+                'ip' => $request->ip(),
             ]);
 
             return response()->json([
-                'message' => 'Invalid or expired token',
+                'status' => 'error',
+                'code' => 'unauthorized',
+                'message' => $e->getMessage() === 'Expired token' ? 'Your session has expired. Please wait while we refresh it.' : 'Invalid or expired token',
             ], 401);
         }
 

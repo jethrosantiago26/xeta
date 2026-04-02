@@ -138,15 +138,26 @@ export function SessionProvider({ children }) {
       }
 
       try {
+        console.debug('[SessionContext] Loading auth token...')
         const token = await getToken()
         setApiAuthToken(token)
+
         try {
+          console.debug('[SessionContext] Syncing user with backend...')
           await syncAuth()
-        } catch {
-          // Continue with getMe so existing users can still load their profile.
+        } catch (syncError) {
+          console.warn('[SessionContext] Sync failed, falling back to profile fetch.', syncError)
         }
+
+        console.debug('[SessionContext] Fetching user profile...')
         const response = await getMe()
         const currentUser = normalizeUser(response.data)
+
+        console.log('[SessionContext] Profile loaded:', {
+          id: currentUser?.id,
+          role: currentUser?.role,
+          email: currentUser?.email,
+        })
 
         if (active) {
           setProfile(currentUser)

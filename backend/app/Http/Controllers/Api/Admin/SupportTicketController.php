@@ -11,6 +11,8 @@ use App\Models\SupportTicket;
 use App\Services\SupportTicketService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class SupportTicketController extends Controller
 {
@@ -76,13 +78,38 @@ class SupportTicketController extends Controller
     {
         $ticketModel = SupportTicket::findOrFail($ticket);
 
+        $imageUrl = $this->storeUploadedImage($request);
+        $messageText = $request->validated('message') ?? '';
+
+        if (empty(trim($messageText)) && !$imageUrl) {
+            throw ValidationException::withMessages([
+                'message' => ['A message or image is required.'],
+            ]);
+        }
+
         $message = $this->supportTicketService->addMessage(
             $ticketModel,
             $request->user(),
-            $request->validated('message'),
-            'admin'
+            $messageText ?: '📷 Image attached',
+            'admin',
+            true,
+            $imageUrl
         );
 
         return new SupportMessageResource($message);
+    }
+
+    /**
+     * Store an uploaded image to the public disk and return the URL.
+     */
+    private function storeUploadedImage(Request $request): ?string
+    {
+        if (!$request->hasFile('image') || !$request->file('image')->isValid()) {
+            return null;
+        }
+
+        $path = $request->file('image')->store('support-attachments', 'public');
+
+        return '/storage/' . $path;
     }
 }

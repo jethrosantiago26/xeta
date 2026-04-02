@@ -14,6 +14,9 @@ use App\Http\Controllers\Api\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Api\Admin\ProductController as AdminProductController;
 use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Api\Admin\SupportTicketController as AdminSupportTicketController;
+use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
+use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
+use App\Http\Controllers\Api\Admin\AnalyticsController as AdminAnalyticsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -70,6 +73,7 @@ Route::prefix('v1')->group(function () {
         Route::post('support/tickets', [SupportTicketController::class, 'store']);
         Route::get('support/tickets/{ticket}', [SupportTicketController::class, 'show']);
         Route::post('support/tickets/{ticket}/messages', [SupportTicketController::class, 'storeMessage']);
+        Route::post('support/tickets/{ticket}/reopen', [SupportTicketController::class, 'reopen']);
 
         /*
         |--------------------------------------------------------------------------
@@ -85,6 +89,8 @@ Route::prefix('v1')->group(function () {
             Route::post('products', [AdminProductController::class, 'store']);
             Route::put('products/{product}', [AdminProductController::class, 'update']);
             Route::delete('products/{product}', [AdminProductController::class, 'destroy']);
+            Route::post('products/{product}/restore', [AdminProductController::class, 'restore']);
+            Route::delete('products/{product}/force', [AdminProductController::class, 'forceDelete']);
 
             // Variant Management
             Route::post('products/{product}/variants', [AdminProductController::class, 'storeVariant']);
@@ -92,8 +98,12 @@ Route::prefix('v1')->group(function () {
             Route::delete('products/{product}/variants/{variant}', [AdminProductController::class, 'destroyVariant']);
 
             // Order Management
+            Route::post('orders/bulk', [AdminOrderController::class, 'bulkAction']);
             Route::get('orders', [AdminOrderController::class, 'index']);
             Route::put('orders/{order}', [AdminOrderController::class, 'update']);
+            Route::delete('orders/{order}', [AdminOrderController::class, 'destroy']);
+            Route::post('orders/{order}/restore', [AdminOrderController::class, 'restore']);
+            Route::delete('orders/{order}/force', [AdminOrderController::class, 'forceDelete']);
 
             // Support (admin)
             Route::get('support/tickets', [AdminSupportTicketController::class, 'index']);
@@ -105,6 +115,23 @@ Route::prefix('v1')->group(function () {
             Route::get('reviews', [AdminReviewController::class, 'index']);
             Route::put('reviews/{review}', [AdminReviewController::class, 'update']);
             Route::delete('reviews/{review}', [AdminReviewController::class, 'destroy']);
+            Route::post('reviews/{review}/restore', [AdminReviewController::class, 'restore']);
+            Route::delete('reviews/{review}/force', [AdminReviewController::class, 'forceDelete']);
+
+            // Customers (admin)
+            Route::get('customers', [AdminCustomerController::class, 'index']);
+            Route::get('customers/{customer}', [AdminCustomerController::class, 'show']);
+            Route::put('customers/{customer}', [AdminCustomerController::class, 'update']);
+            Route::delete('customers/{customer}', [AdminCustomerController::class, 'destroy']);
+            Route::post('customers/{customer}/restore', [AdminCustomerController::class, 'restore']);
+            Route::delete('customers/{customer}/force', [AdminCustomerController::class, 'forceDelete']);
+
+            // Inventory (admin)
+            Route::get('inventory', [AdminInventoryController::class, 'index']);
+            Route::put('inventory/variants/{variant}/stock', [AdminInventoryController::class, 'updateStock']);
+
+            // Analytics (admin)
+            Route::get('analytics', [AdminAnalyticsController::class, 'index']);
         });
     });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useSession } from '../context/SessionContext.jsx'
@@ -15,6 +16,10 @@ function ProductDetailPage() {
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [adding, setAdding] = useState(false)
+  
+  // Cart Bottom Sheet state
+  const [showCartSheet, setShowCartSheet] = useState(false)
+  const [cartQuantity, setCartQuantity] = useState(1)
 
   // Reviews state
   const { profile, isLoaded: sessionLoaded, isSignedIn } = useSession()
@@ -318,9 +323,30 @@ function ProductDetailPage() {
           </div>
 
           {selectedVariant ? (
-            <p className="muted" style={{ margin: 0 }}>
-              Selected: {selectedVariant.name}
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p className="muted" style={{ margin: 0 }}>
+                Selected: {selectedVariant.name}
+              </p>
+              
+              <div className="stock-status" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
+                {selectedVariant.stock_quantity > 0 ? (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span style={{ color: '#10b981' }}>In Stock. <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>Ready to ship.</span></span>
+                  </>
+                ) : (
+                  <>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    <span style={{ color: '#ef4444' }}>Currently Unavailable.</span>
+                  </>
+                )}
+              </div>
+            </div>
           ) : null}
 
           {actionError ? <div className="notice error">{actionError}</div> : null}
@@ -330,27 +356,14 @@ function ProductDetailPage() {
             <button
               type="button"
               className="button button-primary"
-              disabled={!selectedVariant}
-              onClick={async () => {
-                if (!selectedVariant) {
-                  return
-                }
-
-                setAdding(true)
-                setActionError('')
-                setActionMessage('')
-
-                try {
-                  await addItem(selectedVariant.id, 1)
-                  setActionMessage('Added to cart.')
-                } catch (error) {
-                  setActionError('Sign in first to add this item to your cart.')
-                } finally {
-                  setAdding(false)
-                }
+              disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
+              onClick={() => {
+                if (!selectedVariant || selectedVariant.stock_quantity === 0) return
+                setCartQuantity(1)
+                setShowCartSheet(true)
               }}
             >
-              {adding ? 'Adding...' : 'Add to cart'}
+              {selectedVariant?.stock_quantity === 0 ? 'Sold Out' : 'Add to cart'}
             </button>
             <Link className="button button-secondary" to="/cart">
               Go to cart
@@ -545,6 +558,96 @@ function ProductDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Add to Cart Bottom Sheet Drawer ── */}
+      {selectedVariant && createPortal(
+        <div 
+          className={`cart-bottom-sheet-backdrop ${showCartSheet ? 'open' : ''}`}
+          onClick={() => setShowCartSheet(false)}
+        >
+          <div 
+            className="cart-bottom-sheet-container"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cart-bottom-sheet-handle" />
+            
+            <div className="cart-bottom-sheet-header">
+              <img 
+                src={image} 
+                alt={selectedVariant.name} 
+                className="cart-bottom-sheet-visual" 
+              />
+              <div className="cart-bottom-sheet-details">
+                <h3 style={{ margin: 0, fontSize: '18px' }}>{product.name}</h3>
+                <p className="muted" style={{ margin: 0, fontSize: '14px' }}>
+                  {selectedVariant.name} · {formatMoney(price)}
+                </p>
+              </div>
+            </div>
+
+            <div className="cart-bottom-sheet-qty-row">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontWeight: 500 }}>Quantity</span>
+                <span className="muted" style={{ fontSize: '13px' }}>
+                  {selectedVariant.stock_quantity > 0 
+                    ? `Current stock: ${selectedVariant.stock_quantity}` 
+                    : 'Out of stock'}
+                </span>
+              </div>
+
+              <div className="cart-bottom-sheet-stepper">
+                <button 
+                  disabled={cartQuantity <= 1}
+                  onClick={() => setCartQuantity(q => Math.max(1, q - 1))}
+                  aria-label="Decrease quantity"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+                <span>{cartQuantity}</span>
+                <button 
+                  disabled={cartQuantity >= selectedVariant.stock_quantity}
+                  onClick={() => setCartQuantity(q => Math.min(selectedVariant.stock_quantity, q + 1))}
+                  aria-label="Increase quantity"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="button button-primary"
+              style={{ width: '100%', padding: '16px', fontSize: '16px' }}
+              disabled={adding || selectedVariant.stock_quantity === 0}
+              onClick={async () => {
+                setAdding(true)
+                setActionError('')
+                setActionMessage('')
+
+                try {
+                  await addItem(selectedVariant.id, cartQuantity)
+                  setActionMessage(`Added ${cartQuantity} item${cartQuantity > 1 ? 's' : ''} to cart.`)
+                  setShowCartSheet(false)
+                } catch (error) {
+                  setActionError('Sign in first to add this item to your cart.')
+                  setShowCartSheet(false)
+                } finally {
+                  setAdding(false)
+                }
+              }}
+            >
+              {adding ? 'Adding to cart...' : `Add to cart — ${formatMoney(price * cartQuantity)}`}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   )
 }

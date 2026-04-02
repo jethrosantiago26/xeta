@@ -30,12 +30,17 @@ class ProductController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $products = Product::with([
+        $query = Product::with([
             'category',
             'variants' => fn ($query) => $query->where('condition', 'new'),
             'images',
-        ])
-            ->orderByDesc('created_at')
+        ]);
+
+        if ($request->boolean('with_archived')) {
+            $query->withTrashed();
+        }
+
+        $products = $query->orderByDesc('created_at')
             ->paginate($request->integer('per_page', 20));
 
         return ProductResource::collection($products);
@@ -102,7 +107,34 @@ class ProductController extends Controller
         Product::findOrFail($product)->delete();
         Cache::forget('categories');
 
-        return response()->json(['message' => 'Product deleted']);
+        return response()->json(['message' => 'Product archived']);
+    }
+
+    /**
+     * Restore a product.
+     */
+    public function restore(int $product): JsonResponse
+    {
+        $productModel = Product::onlyTrashed()->findOrFail($product);
+        $productModel->restore();
+        Cache::forget('categories');
+
+        return response()->json([
+            'message' => 'Product restored',
+            'product' => new ProductResource($productModel->load(['category', 'variants', 'images'])),
+        ]);
+    }
+
+    /**
+     * Permanently delete a product.
+     */
+    public function forceDelete(int $product): JsonResponse
+    {
+        $productModel = Product::withTrashed()->findOrFail($product);
+        $productModel->forceDelete();
+        Cache::forget('categories');
+
+        return response()->json(['message' => 'Product permanently deleted']);
     }
 
     /**

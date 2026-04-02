@@ -7,7 +7,9 @@ import {
   getOrders,
   getSupportTicket,
   getSupportTickets,
+  reopenSupportTicket,
   readResource,
+  getAssetUrl,
 } from '../lib/api.js'
 
 const REFRESH_INTERVAL_MS = 8000
@@ -18,6 +20,7 @@ const emptyTicketForm = {
   order_id: null,
   priority: 'normal',
   message: '',
+  image: null,
 }
 
 const ticketTypes = [
@@ -78,10 +81,20 @@ function SupportPage() {
   const [success, setSuccess] = useState('')
   const messagesEndRef = useRef(null)
   const composerRef = useRef(null)
+  const ticketImageRef = useRef(null)
+  const replyImageRef = useRef(null)
+  const [replyImage, setReplyImage] = useState(null)
 
-  const sortedTickets = useMemo(() => {
-    return [...tickets].sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
-  }, [tickets])
+  const [activeTab, setActiveTab] = useState('active')
+
+  const displayedTickets = useMemo(() => {
+    return [...tickets]
+      .sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
+      .filter(ticket => {
+        const isArchived = ticket.status === 'resolved' || ticket.status === 'closed'
+        return activeTab === 'active' ? !isArchived : isArchived
+      })
+  }, [tickets, activeTab])
 
   function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -213,12 +226,16 @@ function SupportPage() {
     }
 
     try {
-      const response = await createSupportTicket({
-        subject: form.subject.trim(),
-        type: form.type,
-        priority: form.priority,
-        message: finalMessage,
-      })
+      const formData = new FormData()
+      formData.append('subject', form.subject.trim())
+      formData.append('type', form.type)
+      formData.append('priority', form.priority)
+      formData.append('message', finalMessage)
+      if (form.image) {
+        formData.append('image', form.image)
+      }
+
+      const response = await createSupportTicket(formData)
 
       const payload = readResource(response)
       const ticket = payload?.data ?? payload
@@ -239,7 +256,7 @@ function SupportPage() {
   async function handleReply(event) {
     event.preventDefault()
 
-    if (!selectedTicket?.id || !reply.trim()) {
+    if (!selectedTicket?.id || (!reply.trim() && !replyImage)) {
       return
     }
 
@@ -248,8 +265,18 @@ function SupportPage() {
     setSuccess('')
 
     try {
-      await createSupportMessage(selectedTicket.id, { message: reply.trim() })
+      const formData = new FormData()
+      if (reply.trim()) {
+        formData.append('message', reply.trim())
+      }
+      if (replyImage) {
+        formData.append('image', replyImage)
+      }
+
+      await createSupportMessage(selectedTicket.id, formData)
       setReply('')
+      setReplyImage(null)
+      if (replyImageRef.current) replyImageRef.current.value = ''
       await refreshTicket(selectedTicket.id)
       setSuccess('Reply sent.')
     } catch (requestError) {
@@ -263,6 +290,20 @@ function SupportPage() {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       handleReply(event)
+    }
+  }
+
+  async function handleReopenTicket() {
+    if (!selectedTicket) return
+    setSubmitting(true)
+    try {
+      await reopenSupportTicket(selectedTicket.id)
+      await refreshTicket(selectedTicket.id)
+      setSuccess('Ticket reopened successfully. You can now reply.')
+    } catch {
+      setError('Could not reopen the ticket. Please try again later.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -369,10 +410,58 @@ function SupportPage() {
 
             <textarea
               className="textarea"
-              placeholder="Describe the issue, include order numbers or photo links."
+              placeholder="Describe the issue, include order numbers or details."
               value={form.message}
               onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
             />
+
+            {/* Image upload for ticket */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <input
+                ref={ticketImageRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null
+                  setForm((current) => ({ ...current, image: file }))
+                }}
+              />
+              <button
+                type="button"
+                className="button button-secondary"
+                style={{ fontSize: '13px', padding: '8px 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={() => ticketImageRef.current?.click()}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                {form.image ? 'Change image' : 'Attach image'}
+              </button>
+              {form.image && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <img
+                    src={URL.createObjectURL(form.image)}
+                    alt="Preview"
+                    style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--color-border)' }}
+                  />
+                  <span className="muted" style={{ fontSize: '12px' }}>{form.image.name}</span>
+                  <button
+                    type="button"
+                    style={{ background: 'none', border: 'none', color: 'var(--color-error-text)', cursor: 'pointer', fontSize: '13px' }}
+                    onClick={() => {
+                      setForm((current) => ({ ...current, image: null }))
+                      if (ticketImageRef.current) ticketImageRef.current.value = ''
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="actions">
               <button className="button button-primary" type="submit" disabled={submitting}>
                 {submitting ? 'Sending...' : 'Submit ticket'}
@@ -383,12 +472,50 @@ function SupportPage() {
 
         {/* ── Ticket List (Apple-style sidebar) ── */}
         <div className="content-card chat-ticket-list-card">
-          <h2>Your tickets</h2>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ margin: 0, flex: 1 }}>Your tickets</h2>
+            <div style={{ display: 'flex', gap: '8px', background: 'var(--color-bg-secondary)', padding: '4px', borderRadius: '8px' }}>
+              <button 
+                type="button" 
+                onClick={() => setActiveTab('active')}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  background: activeTab === 'active' ? 'var(--color-bg)' : 'transparent',
+                  color: activeTab === 'active' ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  fontWeight: activeTab === 'active' ? 500 : 400,
+                  boxShadow: activeTab === 'active' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                }}
+              >
+                Active
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setActiveTab('archived')}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  background: activeTab === 'archived' ? 'var(--color-bg)' : 'transparent',
+                  color: activeTab === 'archived' ? 'var(--color-text)' : 'var(--color-text-muted)',
+                  fontWeight: activeTab === 'archived' ? 500 : 400,
+                  boxShadow: activeTab === 'archived' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                }}
+              >
+                Archived
+              </button>
+            </div>
+          </div>
           <div className="chat-ticket-list">
-            {sortedTickets.length === 0 ? (
-              <p className="muted" style={{ padding: '16px 0' }}>No tickets yet.</p>
+            {displayedTickets.length === 0 ? (
+              <p className="muted" style={{ padding: '16px 0' }}>No {activeTab} tickets.</p>
             ) : (
-              sortedTickets.map((ticket) => {
+              displayedTickets.map((ticket) => {
                 const isActive = selectedTicket?.id === ticket.id
                 return (
                   <button
@@ -500,7 +627,24 @@ function SupportPage() {
                                 </span>
                               )}
                               <div className={`chat-bubble${isMine ? ' chat-bubble-mine' : ' chat-bubble-theirs'}`}>
-                                <p className="chat-bubble-text">{message.message}</p>
+                                {message.image_url && (
+                                  <img
+                                    src={getAssetUrl(message.image_url)}
+                                    alt="Attachment"
+                                    style={{
+                                      maxWidth: '100%',
+                                      maxHeight: 240,
+                                      borderRadius: 12,
+                                      marginBottom: message.message && message.message !== '📷 Image attached' ? 8 : 0,
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={() => window.open(getAssetUrl(message.image_url), '_blank')}
+                                    loading="lazy"
+                                  />
+                                )}
+                                {message.message && message.message !== '📷 Image attached' && (
+                                  <p className="chat-bubble-text">{message.message}</p>
+                                )}
                               </div>
                               <span className="chat-bubble-time">
                                 {formatMessageTime(message.created_at)}
@@ -517,31 +661,97 @@ function SupportPage() {
             </div>
 
             {/* Composer Bar */}
-            <form className="chat-composer" onSubmit={handleReply}>
-              <textarea
-                ref={composerRef}
-                className="chat-composer-input"
-                placeholder="Type a message…"
-                value={reply}
-                rows={1}
-                onChange={(event) => setReply(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-              />
-              <button
-                className="chat-composer-send"
-                type="submit"
-                disabled={submitting || !reply.trim()}
-                aria-label="Send message"
-              >
-                {submitting ? (
-                  <span className="chat-send-spinner" />
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            {selectedTicket.status === 'resolved' || selectedTicket.status === 'closed' ? (
+              <div className="chat-composer" style={{ justifyContent: 'center', background: 'var(--color-bg-secondary)', borderTop: '1px solid var(--color-border)' }}>
+                <p className="muted" style={{ margin: 0, fontSize: '13px' }}>This ticket has been marked as resolved.</p>
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={handleReopenTicket}
+                  disabled={submitting}
+                  style={{ marginLeft: '12px' }}
+                >
+                  {submitting ? 'Reopening...' : 'Reopen Ticket to Reply'}
+                </button>
+              </div>
+            ) : (
+              <form className="chat-composer" onSubmit={handleReply}>
+                <input
+                  ref={replyImageRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(event) => setReplyImage(event.target.files?.[0] || null)}
+                />
+                <button
+                  type="button"
+                  className="chat-composer-attach"
+                  onClick={() => replyImageRef.current?.click()}
+                  aria-label="Attach image"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: replyImage ? 'var(--color-accent)' : 'var(--color-text-muted)',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    display: 'grid',
+                    placeItems: 'center',
+                    transition: 'color 0.2s',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
                   </svg>
-                )}
-              </button>
-            </form>
+                </button>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: replyImage ? '6px' : 0 }}>
+                  {replyImage && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                      <img
+                        src={URL.createObjectURL(replyImage)}
+                        alt="Preview"
+                        style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--color-border)' }}
+                      />
+                      <span className="muted" style={{ fontSize: '11px', flex: 1 }}>{replyImage.name}</span>
+                      <button
+                        type="button"
+                        style={{ background: 'none', border: 'none', color: 'var(--color-error-text)', cursor: 'pointer', fontSize: '11px' }}
+                        onClick={() => {
+                          setReplyImage(null)
+                          if (replyImageRef.current) replyImageRef.current.value = ''
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  <textarea
+                    ref={composerRef}
+                    className="chat-composer-input"
+                    placeholder="Type a message…"
+                    value={reply}
+                    rows={1}
+                    onChange={(event) => setReply(event.target.value)}
+                    onKeyDown={handleComposerKeyDown}
+                  />
+                </div>
+                <button
+                  className="chat-composer-send"
+                  type="submit"
+                  disabled={submitting || (!reply.trim() && !replyImage)}
+                  aria-label="Send message"
+                >
+                  {submitting ? (
+                    <span className="chat-send-spinner" />
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                  )}
+                </button>
+              </form>
+            )}
           </>
         )}
       </section>

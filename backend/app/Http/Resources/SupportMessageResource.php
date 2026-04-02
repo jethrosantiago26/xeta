@@ -11,13 +11,16 @@ class SupportMessageResource extends JsonResource
     {
         $authorName = $this->user?->name;
 
-        if (!$authorName && $this->author_role === 'system') {
+        if ($this->author_role === 'system') {
             $authorName = 'System';
+        } else if ($this->author_role === 'admin') {
+            $authorName = $this->user?->name ?? 'Support Agent';
         }
 
         return [
             'id' => $this->id,
             'message' => $this->message,
+            'image_url' => $this->image_url,
             'author_role' => $this->author_role,
             'author_name' => $authorName,
             'created_at' => $this->created_at,

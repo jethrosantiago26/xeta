@@ -18,6 +18,7 @@ class StoreSupportTicketRequest extends FormRequest
             'type' => ['required', 'in:order,payment,shipping,product,account,other'],
             'priority' => ['required', 'in:low,normal,high,urgent'],
             'message' => ['required', 'string', 'min:10'],
+            'image' => ['nullable', 'image', 'max:5120'], // 5MB max
         ];
     }
 }

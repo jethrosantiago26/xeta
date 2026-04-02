@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
 import {
   createAdminSupportMessage,
@@ -6,16 +6,34 @@ import {
   getAdminSupportTickets,
   readResource,
   updateAdminSupportTicket,
+  getAssetUrl,
 } from '../lib/api.js'
+import { 
+  Send, 
+  Image as ImageIcon, 
+  Search, 
+  MessageCircle, 
+  ShieldCheck, 
+  User, 
+  Clock, 
+  AlertCircle,
+  CheckCircle2,
+  Paperclip,
+  ChevronRight
+} from 'lucide-react'
 
-const REFRESH_INTERVAL_MS = 8000
+const REFRESH_INTERVAL_MS = 10000
+
+const STATUS_TABS = [
+  { key: 'active', label: 'Active' },
+  { key: 'urgent', label: 'Urgent' },
+  { key: 'resolved', label: 'Resolved' },
+]
 
 const statusOptions = [
   { value: 'open', label: 'Open' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'waiting_customer', label: 'Waiting customer' },
+  { value: 'in_progress', label: 'In Progress' },
   { value: 'resolved', label: 'Resolved' },
-  { value: 'closed', label: 'Closed' },
 ]
 
 const priorityOptions = [
@@ -35,270 +53,314 @@ function AdminSupportPage() {
   const [resolutionSummary, setResolutionSummary] = useState('')
   const [reply, setReply] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState('active')
+  const [search, setSearch] = useState('')
+  
+  const replyImageRef = useRef(null)
+  const [replyImage, setReplyImage] = useState(null)
+  const chatEndRef = useRef(null)
 
-  const sortedTickets = useMemo(() => {
-    return [...tickets].sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
-  }, [tickets])
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
-  async function loadTickets({ background = false } = {}) {
-    if (!background) {
-      setLoadingList(true)
-      setError('')
+  useEffect(() => {
+    if (selectedTicket) scrollToBottom()
+  }, [selectedTicket?.messages])
+
+  const filteredTickets = useMemo(() => {
+    let results = [...tickets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+    // Tab filter
+    if (activeTab === 'active') {
+      results = results.filter(t => t.status !== 'resolved' && t.status !== 'closed')
+    } else if (activeTab === 'urgent') {
+      results = results.filter(t => t.priority === 'urgent' && t.status !== 'resolved')
+    } else if (activeTab === 'resolved') {
+      results = results.filter(t => t.status === 'resolved' || t.status === 'closed')
     }
 
-    try {
-      const response = await getAdminSupportTickets({ per_page: 20 })
-      const payload = readResource(response)
-      const records = payload?.data?.data ?? payload?.data ?? []
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      results = results.filter(t => 
+        t.subject?.toLowerCase().includes(q) || 
+        t.ticket_number?.toLowerCase().includes(q) ||
+        t.user?.email?.toLowerCase().includes(q)
+      )
+    }
 
+    return results
+  }, [tickets, activeTab, search])
+
+  const tabCounts = useMemo(() => ({
+    active: tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').length,
+    urgent: tickets.filter(t => t.priority === 'urgent' && t.status !== 'resolved').length,
+    resolved: tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length,
+  }), [tickets])
+
+  async function loadTickets({ background = false } = {}) {
+    if (!background) setLoadingList(true)
+    try {
+      const response = await getAdminSupportTickets({ per_page: 50 })
+      const payload = readResource(response)
+      // Laravel ResourceCollection wraps in { data: [...] }
+      const records = payload?.data?.data ?? payload?.data ?? []
       setTickets(Array.isArray(records) ? records : [])
-    } catch (requestError) {
-      if (!background) {
-        setTickets([])
-        setError(requestError?.response?.data?.message || 'Support tickets could not be loaded.')
-      }
+    } catch {
+      if (!background) setError('Failed to load tickets.')
     } finally {
-      if (!background) {
-        setLoadingList(false)
-      }
+      if (!background) setLoadingList(false)
     }
   }
 
   useEffect(() => {
-    let active = true
+    loadTickets()
+    const interval = setInterval(() => loadTickets({ background: true }), REFRESH_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [])
 
-    async function boot() {
-      if (!active) {
-        return
-      }
-
-      await loadTickets()
-    }
-
-    function refreshVisibleData() {
-      if (document.hidden || !active) {
-        return
-      }
-
-      loadTickets({ background: true })
-
-      if (selectedTicket?.id) {
-        loadTicket(selectedTicket.id, { background: true })
-      }
-    }
-
-    boot()
-
-    const intervalId = window.setInterval(refreshVisibleData, REFRESH_INTERVAL_MS)
-    window.addEventListener('focus', refreshVisibleData)
-
-    return () => {
-      active = false
-      window.clearInterval(intervalId)
-      window.removeEventListener('focus', refreshVisibleData)
-    }
-  }, [selectedTicket?.id])
-
-  async function loadTicket(ticketId, { background = false } = {}) {
-    if (!background) {
-      setLoadingTicket(true)
-      setError('')
-      setSuccess('')
-    }
-
+  async function loadTicket(ticketId) {
+    setLoadingTicket(true)
     try {
       const response = await getAdminSupportTicket(ticketId)
-      const payload = readResource(response)
-      const ticket = payload?.data ?? payload
+      const raw = readResource(response)
+      // Laravel JsonResource wraps single objects in { data: { ... } }
+      const ticket = raw?.data ?? raw
+      if (!ticket?.id) throw new Error('Empty ticket response')
       setSelectedTicket(ticket)
       setStatus(ticket.status)
       setPriority(ticket.priority)
       setResolutionSummary(ticket.resolution_summary || '')
-    } catch (requestError) {
-      if (!background) {
-        setError(requestError?.response?.data?.message || 'Ticket details could not be loaded.')
-      }
+    } catch (err) {
+      setError('Failed to load ticket details.')
+      console.error('[loadTicket]', err)
     } finally {
-      if (!background) {
-        setLoadingTicket(false)
-      }
+      setLoadingTicket(false)
     }
   }
 
-  async function handleUpdate(event) {
-    event.preventDefault()
-
-    if (!selectedTicket?.id) {
-      return
-    }
-
+  async function handleUpdate(e) {
+    e.preventDefault()
     setSaving(true)
-    setError('')
-    setSuccess('')
-
     try {
       const response = await updateAdminSupportTicket(selectedTicket.id, {
         status,
         priority,
         resolution_summary: resolutionSummary.trim() || null,
       })
-      const payload = readResource(response)
-      const ticket = payload?.data ?? payload
-
+      const raw = readResource(response)
+      const ticket = raw?.data ?? raw
       setSelectedTicket(ticket)
-      setSuccess('Ticket updated.')
-      setTickets((current) => current.map((item) => (item.id === ticket.id ? ticket : item)))
-    } catch (requestError) {
-      setError(requestError?.response?.data?.message || 'Update failed.')
+      setTickets(curr => curr.map(item => item.id === ticket.id ? ticket : item))
+    } catch (err) {
+      console.error('[handleUpdate]', err)
+      alert('Update failed.')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleReply(event) {
-    event.preventDefault()
-
-    if (!selectedTicket?.id || !reply.trim()) {
-      return
-    }
-
+  async function handleReply(e) {
+    e.preventDefault()
+    if (!reply.trim() && !replyImage) return
     setSaving(true)
-    setError('')
-    setSuccess('')
-
     try {
-      await createAdminSupportMessage(selectedTicket.id, { message: reply.trim() })
+      const formData = new FormData()
+      if (reply.trim()) formData.append('message', reply.trim())
+      if (replyImage) formData.append('image', replyImage)
+
+      await createAdminSupportMessage(selectedTicket.id, formData)
       setReply('')
+      setReplyImage(null)
+      if (replyImageRef.current) replyImageRef.current.value = ''
       await loadTicket(selectedTicket.id)
-      setSuccess('Reply sent.')
-    } catch (requestError) {
-      setError(requestError?.response?.data?.message || 'Reply could not be sent.')
+    } catch {
+      alert('Reply failed.')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="page-grid">
-      <PageHeader
-        eyebrow="Support"
-        title="Support Inbox"
-        description="Review customer tickets, reply, and resolve cases."
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', gap: 0 }}>
+      {/* Page Header */}
+      <div style={{ padding: '24px 32px 16px', flexShrink: 0 }}>
+        <PageHeader
+          eyebrow="Operations"
+          title="Support Inbox"
+          description="Unified desk for customer inquiries and issue resolution."
+        />
+      </div>
 
-      {loadingList ? <div className="notice">Loading support tickets...</div> : null}
-      {error ? <div className="notice error">{error}</div> : null}
-      {success ? <div className="notice success">{success}</div> : null}
-
-      <section className="grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.2fr)' }}>
-        <div className="content-card">
-          <h2>Ticket queue</h2>
-          <p className="muted">Select a ticket to triage.</p>
-          <div className="stack">
-            {sortedTickets.length === 0 ? (
-              <p className="muted">No tickets in queue.</p>
-            ) : (
-              sortedTickets.map((ticket) => (
-                <button
-                  key={ticket.id}
-                  type="button"
-                  className="content-card"
-                  style={{ textAlign: 'left' }}
-                  onClick={() => loadTicket(ticket.id)}
-                >
-                  <div className="row" style={{ justifyContent: 'space-between' }}>
-                    <div>
-                      <h3>{ticket.subject}</h3>
-                      <p className="muted">{ticket.ticket_number} · {ticket.type}</p>
-                    </div>
-                    <span className="status-pill">{ticket.status}</span>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="content-card">
-          <h2>Ticket workspace</h2>
-          {loadingTicket ? <p className="muted">Loading ticket...</p> : null}
-          {!selectedTicket ? (
-            <p className="muted">Select a ticket to start working.</p>
-          ) : (
-            <div className="stack">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <div>
-                  <h3>{selectedTicket.subject}</h3>
-                  <p className="muted">{selectedTicket.ticket_number} · {selectedTicket.type}</p>
-                </div>
-                <span className="status-pill">{selectedTicket.status}</span>
-              </div>
-              <div className="divider" />
-              <form className="stack" onSubmit={handleUpdate}>
-                <div className="field-grid">
-                  <label className="stack" style={{ gap: '6px' }}>
-                    <span className="muted">Status</span>
-                    <select className="select" value={status} onChange={(event) => setStatus(event.target.value)}>
-                      {statusOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="stack" style={{ gap: '6px' }}>
-                    <span className="muted">Priority</span>
-                    <select className="select" value={priority} onChange={(event) => setPriority(event.target.value)}>
-                      {priorityOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <textarea
-                  className="textarea"
-                  placeholder="Resolution summary (optional)"
-                  value={resolutionSummary}
-                  onChange={(event) => setResolutionSummary(event.target.value)}
-                />
-                <div className="actions">
-                  <button className="button button-secondary" type="submit" disabled={saving}>
-                    {saving ? 'Saving...' : 'Update ticket'}
-                  </button>
-                </div>
-              </form>
-
-              <div className="divider" />
-
-              <div className="stack">
-                {(selectedTicket.messages || []).map((message) => (
-                  <div key={message.id} className="content-card">
-                    <div className="row" style={{ justifyContent: 'space-between' }}>
-                      <strong>{message.author_name || message.author_role}</strong>
-                      <span className="muted">{new Date(message.created_at).toLocaleString()}</span>
-                    </div>
-                    <p style={{ marginBottom: 0 }}>{message.message}</p>
-                  </div>
-                ))}
-              </div>
-
-              <form className="stack" onSubmit={handleReply}>
-                <textarea
-                  className="textarea"
-                  placeholder="Reply to the customer..."
-                  value={reply}
-                  onChange={(event) => setReply(event.target.value)}
-                />
-                <div className="actions">
-                  <button className="button button-primary" type="submit" disabled={saving}>
-                    {saving ? 'Sending...' : 'Send reply'}
-                  </button>
-                </div>
-              </form>
+      <div style={{ display: 'flex', gap: '20px', flex: 1, minHeight: 0, padding: '0 32px 24px' }}>
+        
+        {/* Inbox Sidebar */}
+        <aside className="content-card" style={{ width: '380px', flexShrink: 0, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)' }}>
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
+              <input
+                className="input"
+                placeholder="Search inbox..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: '32px', fontSize: '13px', height: '36px' }}
+              />
             </div>
+            <div className="pipeline-tabs" style={{ background: 'var(--color-surface-3)', padding: '2px' }}>
+              {STATUS_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  className={`pipeline-tab ${activeTab === tab.key ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{ fontSize: '11px', padding: '6px 12px' }}
+                >
+                  {tab.label}
+                  <span className="pipeline-tab-count" style={{ marginLeft: '4px' }}>{tabCounts[tab.key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {loadingList ? <div className="notice">Loading...</div> : null}
+            {filteredTickets.map(ticket => {
+              const isSelected = selectedTicket?.id === ticket.id
+              const isUrgent = ticket.priority === 'urgent'
+              return (
+                <div
+                  key={ticket.id}
+                  onClick={() => loadTicket(ticket.id)}
+                  style={{
+                    padding: '16px',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--color-border)',
+                    background: isSelected ? 'var(--color-surface-3)' : 'transparent',
+                    borderLeft: isUrgent ? '3px solid var(--color-error)' : '3px solid transparent',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-muted)' }}>{ticket.ticket_number}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div style={{ fontWeight: isSelected ? 700 : 600, fontSize: '14px', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {ticket.subject}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className={`status-pill ${ticket.status === 'open' ? 'warning' : 'success'}`} style={{ fontSize: '10px', height: '18px' }}>
+                      {ticket.status}
+                    </span>
+                    {isUrgent && <AlertCircle size={12} color="var(--color-error)" />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </aside>
+
+        {/* Workspace Area */}
+        <main className="content-card" style={{ flex: 1, padding: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {!selectedTicket ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, opacity: 0.4 }}>
+              <MessageCircle size={48} />
+              <p>Select a ticket to view conversation</p>
+            </div>
+          ) : (
+            <>
+              {/* Workspace Header */}
+              <header style={{ padding: '16px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>{selectedTicket.subject}</h3>
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <User size={12} /> {selectedTicket.user?.name || 'Guest'} ({selectedTicket.user?.email || 'No email'})
+                    <ChevronRight size={12} />
+                    <Clock size={12} /> Created {new Date(selectedTicket.created_at).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span className={`status-pill status-${selectedTicket.priority}`} style={{ textTransform: 'capitalize' }}>{selectedTicket.priority} Priority</span>
+                </div>
+              </header>
+
+              {/* Chat View */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', background: 'var(--color-surface-2)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {selectedTicket.messages?.map((msg, idx) => {
+                  const isStaff = msg.author_role === 'admin' || msg.author_role === 'staff'
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: isStaff ? 'flex-end' : 'flex-start' }}>
+                      <div className={`message-bubble ${isStaff ? 'message-staff' : 'message-customer'}`} style={{ maxWidth: '75%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', opacity: 0.8 }}>
+                          {isStaff ? <ShieldCheck size={12} /> : <User size={12} />}
+                          <span style={{ fontSize: '11px', fontWeight: 700 }}>{msg.author_name || (isStaff ? 'Support Staff' : 'Customer')}</span>
+                          <span style={{ fontSize: '10px', marginLeft: 'auto' }}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        {msg.image_url && (
+                          <img 
+                            src={getAssetUrl(msg.image_url)} 
+                            alt="Attachment" 
+                            style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '8px', display: 'block' }} 
+                            onClick={() => window.open(getAssetUrl(msg.image_url), '_blank')}
+                          />
+                        )}
+                        <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.65' }}>{msg.message}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Triage & Reply Section */}
+              <footer style={{ padding: '20px 24px', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface-1)' }}>
+                <form onSubmit={handleUpdate} style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'flex-end', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Update Status</label>
+                    <select className="select" style={{ height: '32px', fontSize: '12px' }} value={status} onChange={e => setStatus(e.target.value)}>
+                      {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" style={{ fontSize: '11px' }}>Priority</label>
+                    <select className="select" style={{ height: '32px', fontSize: '12px' }} value={priority} onChange={e => setPriority(e.target.value)}>
+                      {priorityOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <button className="button button-secondary" type="submit" style={{ height: '32px', padding: '0 16px', fontSize: '12px' }} disabled={saving}>
+                    Update Case
+                  </button>
+                </form>
+
+                <form onSubmit={handleReply}>
+                  <div className="textarea-container" style={{ position: 'relative', background: 'var(--color-surface-2)', borderRadius: '12px', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
+                    <textarea
+                      className="textarea"
+                      placeholder="Type your reply here..."
+                      value={reply}
+                      onChange={e => setReply(e.target.value)}
+                      style={{ border: 'none', minHeight: '100px', background: 'transparent', resize: 'none', padding: '14px 16px', fontSize: '14px', lineHeight: '1.6' }}
+                    />
+                    <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--color-surface-3)' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="file" ref={replyImageRef} style={{ display: 'none' }} onChange={e => setReplyImage(e.target.files[0])} />
+                        <button type="button" className="button-icon" onClick={() => replyImageRef.current?.click()}>
+                          <Paperclip size={16} />
+                        </button>
+                        {replyImage && <span style={{ fontSize: '11px', color: 'var(--color-accent)' }}>{replyImage.name}</span>}
+                      </div>
+                      <button className="button button-primary" type="submit" style={{ padding: '6px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }} disabled={saving || (!reply.trim() && !replyImage)}>
+                        <Send size={14} /> Send
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </footer>
+            </>
           )}
-        </div>
-      </section>
+        </main>
+      </div>
     </div>
   )
 }

@@ -18,6 +18,10 @@ class ReviewController extends Controller
     {
         $query = Review::with(['user', 'product'])->orderByDesc('created_at');
 
+        if ($request->boolean('with_archived')) {
+            $query->withTrashed();
+        }
+
         if ($request->filled('status')) {
             $status = $request->input('status');
             if ($status === 'approved') {
@@ -54,14 +58,39 @@ class ReviewController extends Controller
     }
 
     /**
-     * Delete a review.
+     * Archive a review.
      */
     public function destroy(Review $review): JsonResponse
     {
         $review->delete();
 
         return response()->json([
-            'message' => 'Review deleted successfully',
+            'message' => 'Review archived successfully',
         ]);
+    }
+
+    /**
+     * Restore an archived review.
+     */
+    public function restore($id): JsonResponse
+    {
+        $review = Review::onlyTrashed()->findOrFail($id);
+        $review->restore();
+
+        return response()->json([
+            'message' => 'Review restored successfully',
+            'review' => new ReviewResource($review->load(['user', 'product'])),
+        ]);
+    }
+
+    /**
+     * Permanently delete a review.
+     */
+    public function forceDelete($id): JsonResponse
+    {
+        $review = Review::withTrashed()->findOrFail($id);
+        $review->forceDelete();
+
+        return response()->json(['message' => 'Review permanently deleted']);
     }
 }

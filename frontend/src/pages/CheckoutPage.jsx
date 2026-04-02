@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useSession } from '../context/SessionContext.jsx'
 import { placeCashOnDeliveryOrder } from '../lib/api.js'
@@ -49,22 +49,23 @@ function CheckoutPage() {
       return
     }
 
-    setForm((current) => ({
-      ...current,
-      name: profile.name ?? current.name,
-      phone: profile.phone ?? current.phone,
-      line1: profile.address_line1 ?? current.line1,
-      line2: profile.address_line2 ?? current.line2,
-      city: profile.city ?? current.city,
-      state: profile.state ?? current.state,
-      postal_code: profile.postal_code ?? current.postal_code,
-      country: profile.country ?? current.country,
-      timezone: profile.timezone ?? current.timezone,
-      location_name: profile.location_name ?? current.location_name,
-      latitude: profile.latitude ?? current.latitude,
-      longitude: profile.longitude ?? current.longitude,
-    }))
+    setForm({
+      name: profile.name ?? '',
+      phone: profile.phone ?? '',
+      line1: profile.address_line1 ?? '',
+      line2: profile.address_line2 ?? '',
+      city: profile.city ?? '',
+      state: profile.state ?? '',
+      postal_code: profile.postal_code ?? '',
+      country: profile.country ?? 'PH',
+      timezone: profile.timezone ?? '',
+      location_name: profile.location_name ?? '',
+      latitude: profile.latitude ?? '',
+      longitude: profile.longitude ?? '',
+    })
   }, [profile])
+
+  const addressMissing = !form.line1.trim() || !form.city.trim() || !form.postal_code.trim()
 
   async function handleCheckout() {
     if (items.length === 0) {
@@ -72,8 +73,8 @@ function CheckoutPage() {
       return
     }
 
-    if (!form.name.trim() || !form.line1.trim() || !form.city.trim() || !form.postal_code.trim()) {
-      setError('Please complete full name, address line 1, city, and postal code before placing your order.')
+    if (!form.name.trim() || addressMissing) {
+      setError('Your delivery address is incomplete. Please update your profile first.')
       return
     }
 
@@ -108,6 +109,10 @@ function CheckoutPage() {
     }
   }
 
+  const SyncedLabel = () => (
+    <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+  )
+
   return (
     <div className="page-grid">
       <section className="content-card">
@@ -125,71 +130,103 @@ function CheckoutPage() {
           <p className="caption">Items in cart: {items.length}</p>
         </div>
         <div className="summary-card">
-          <h3>Delivery address</h3>
-          <div className="field-grid" style={{ marginTop: '14px' }}>
-            <input
-              className="input"
-              placeholder="Full name"
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Phone number"
-              value={form.phone}
-              onChange={(event) => setForm({ ...form, phone: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Address line 1"
-              value={form.line1}
-              onChange={(event) => setForm({ ...form, line1: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Address line 2"
-              value={form.line2}
-              onChange={(event) => setForm({ ...form, line2: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="City"
-              value={form.city}
-              onChange={(event) => setForm({ ...form, city: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="State / Province"
-              value={form.state}
-              onChange={(event) => setForm({ ...form, state: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Postal code"
-              value={form.postal_code}
-              onChange={(event) => setForm({ ...form, postal_code: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Country code"
-              value={form.country}
-              onChange={(event) => setForm({ ...form, country: event.target.value.toUpperCase() })}
-            />
-            <input
-              className="input"
-              placeholder="Location name"
-              value={form.location_name}
-              onChange={(event) => setForm({ ...form, location_name: event.target.value })}
-            />
-            <input
-              className="input"
-              placeholder="Timezone"
-              value={form.timezone}
-              onChange={(event) => setForm({ ...form, timezone: event.target.value })}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <h3 style={{ margin: 0 }}>Delivery address</h3>
+            <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 8px' }}>
+              Synced from profile
+            </span>
           </div>
-          {error ? <div className="notice error">{error}</div> : null}
-          <button type="button" className="button button-primary" onClick={handleCheckout} disabled={loading || items.length === 0}>
+          <p className="muted" style={{ margin: '0 0 14px', fontSize: '13px' }}>
+            To update your delivery details, go to your{' '}
+            <Link to="/account" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>
+              Profile
+            </Link>.
+          </p>
+
+          {addressMissing ? (
+            <div className="notice error" style={{ marginBottom: '16px' }}>
+              Your delivery address is incomplete. Please{' '}
+              <Link to="/account" style={{ color: 'inherit', textDecoration: 'underline', fontWeight: 600 }}>
+                update your profile
+              </Link>{' '}
+              with a full address before checking out.
+            </div>
+          ) : null}
+
+          <div className="field-grid" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Full name <SyncedLabel />
+              </label>
+              <input className="input input-readonly" readOnly value={form.name} placeholder="—" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Phone number <SyncedLabel />
+              </label>
+              <input className="input input-readonly" readOnly value={form.phone} placeholder="—" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Address line 1 <SyncedLabel />
+              </label>
+              <input className="input input-readonly" readOnly value={form.line1} placeholder="—" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Address line 2 <SyncedLabel />
+              </label>
+              <input className="input input-readonly" readOnly value={form.line2} placeholder="—" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  City <SyncedLabel />
+                </label>
+                <input className="input input-readonly" readOnly value={form.city} placeholder="—" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  State / Province <SyncedLabel />
+                </label>
+                <input className="input input-readonly" readOnly value={form.state} placeholder="—" />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  Postal code <SyncedLabel />
+                </label>
+                <input className="input input-readonly" readOnly value={form.postal_code} placeholder="—" />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  Country <SyncedLabel />
+                </label>
+                <input className="input input-readonly" readOnly value={form.country} placeholder="—" />
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Location name <SyncedLabel />
+              </label>
+              <input className="input input-readonly" readOnly value={form.location_name} placeholder="—" />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                Timezone <SyncedLabel />
+              </label>
+              <input className="input input-readonly" readOnly value={form.timezone} placeholder="—" />
+            </div>
+          </div>
+          {error ? <div className="notice error" style={{ marginTop: '16px' }}>{error}</div> : null}
+          <button
+            type="button"
+            className="button button-primary"
+            style={{ marginTop: '16px', width: '100%' }}
+            onClick={handleCheckout}
+            disabled={loading || items.length === 0 || addressMissing}
+          >
             {loading ? 'Placing order...' : 'Place COD order'}
           </button>
         </div>

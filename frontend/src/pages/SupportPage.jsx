@@ -18,7 +18,6 @@ const emptyTicketForm = {
   subject: '',
   type: 'order',
   order_id: null,
-  priority: 'normal',
   message: '',
   image: null,
 }
@@ -30,13 +29,6 @@ const ticketTypes = [
   { value: 'product', label: 'Product' },
   { value: 'account', label: 'Account' },
   { value: 'other', label: 'Other' },
-]
-
-const priorityOptions = [
-  { value: 'low', label: 'Low' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High' },
-  { value: 'urgent', label: 'Urgent' },
 ]
 
 function formatMessageTime(dateString) {
@@ -229,7 +221,6 @@ function SupportPage() {
       const formData = new FormData()
       formData.append('subject', form.subject.trim())
       formData.append('type', form.type)
-      formData.append('priority', form.priority)
       formData.append('message', finalMessage)
       if (form.image) {
         formData.append('image', form.image)
@@ -337,32 +328,18 @@ function SupportPage() {
               value={form.subject}
               onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))}
             />
-            <div className="field-grid">
-              <label className="stack" style={{ gap: '6px' }}>
-                <span className="muted">Type</span>
-                <select
-                  className="select"
-                  value={form.type}
-                  onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
-                >
-                  {ticketTypes.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="stack" style={{ gap: '6px' }}>
-                <span className="muted">Priority</span>
-                <select
-                  className="select"
-                  value={form.priority}
-                  onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))}
-                >
-                  {priorityOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <label className="stack" style={{ gap: '6px' }}>
+              <span className="muted">Type</span>
+              <select
+                className="select"
+                value={form.type}
+                onChange={(event) => setForm((current) => ({ ...current, type: event.target.value }))}
+              >
+                {ticketTypes.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
 
             {form.type === 'order' && orders.length > 0 && (
               <div className="support-order-selector">
@@ -565,7 +542,7 @@ function SupportPage() {
                 <div>
                   <h3 className="chat-header-title">{selectedTicket.subject}</h3>
                   <span className="chat-header-meta">
-                    {selectedTicket.ticket_number} · {selectedTicket.type} · {selectedTicket.priority}
+                    {selectedTicket.ticket_number} · {selectedTicket.type}
                   </span>
                 </div>
               </div>

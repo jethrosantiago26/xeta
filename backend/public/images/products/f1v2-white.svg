@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">XETA F1 V2 White</title>
+  <desc id="desc">Minimal product placeholder for the XETA F1 V2 mouse.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f2ea" />
+      <stop offset="100%" stop-color="#d9d0c2" />
+    </linearGradient>
+    <linearGradient id="mouse" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#d7d1c8" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="64" fill="url(#bg)" />
+  <circle cx="940" cy="160" r="170" fill="#ece5d9" opacity="0.85" />
+  <circle cx="250" cy="760" r="220" fill="#cbbda9" opacity="0.35" />
+  <g transform="translate(330 210)">
+    <path d="M280 60c118 0 214 96 214 214v138c0 144-116 260-260 260H190C105 672 36 603 36 518V274C36 156 132 60 250 60h30z" fill="url(#mouse)" stroke="#9b948a" stroke-width="10" />
+    <rect x="226" y="132" width="78" height="170" rx="39" fill="#efe8de" stroke="#9b948a" stroke-width="8" />
+    <path d="M262 310c90 0 164 74 164 164v10c0 91-74 165-165 165h-24c-91 0-165-74-165-165v-15c0-88 72-159 160-159z" fill="#f6f0e7" opacity="0.8" />
+    <text x="118" y="760" fill="#4b4338" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" letter-spacing="6">XETA F1 V2</text>
+    <text x="118" y="812" fill="#6f6659" font-family="Arial, Helvetica, sans-serif" font-size="28">Wireless performance mouse</text>
+  </g>
+</svg>

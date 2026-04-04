@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { createElement, useCallback, useEffect, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
-import { getAdminAnalytics, getAdminDashboard, readResource } from '../lib/api.js'
+import { getAdminAnalytics, readResource } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
 import { ShoppingBag, Users, Package, TrendingUp, BarChart2, AlertTriangle } from 'lucide-react'
 
@@ -18,11 +18,40 @@ const STATUS_COLORS = {
   cancelled: 'var(--color-error-text)',
 }
 
-function KpiCard({ icon: Icon, label, value, sub, accent }) {
+const analyticsInFlight = new Map()
+const analyticsCache = new Map()
+
+async function loadAnalyticsSnapshot(days) {
+  const cacheKey = String(days)
+
+  if (analyticsCache.has(cacheKey)) {
+    return analyticsCache.get(cacheKey)
+  }
+
+  if (analyticsInFlight.has(cacheKey)) {
+    return analyticsInFlight.get(cacheKey)
+  }
+
+  const request = getAdminAnalytics({ days })
+    .then((response) => readResource(response))
+    .then((payload) => {
+      analyticsCache.set(cacheKey, payload)
+      return payload
+    })
+    .finally(() => {
+      analyticsInFlight.delete(cacheKey)
+    })
+
+  analyticsInFlight.set(cacheKey, request)
+
+  return request
+}
+
+function KpiCard({ icon, label, value, sub, accent }) {
   return (
     <div className="dashboard-kpi-card">
       <div className="dashboard-kpi-icon" style={accent ? { background: `${accent}20`, color: accent, borderColor: `${accent}40` } : {}}>
-        <Icon size={20} />
+        {icon ? createElement(icon, { size: 20 }) : null}
       </div>
       <div className="dashboard-kpi-body">
         <div className="dashboard-kpi-value">{value}</div>
@@ -35,7 +64,6 @@ function KpiCard({ icon: Icon, label, value, sub, accent }) {
 
 function AdminAnalyticsPage() {
   const [analytics, setAnalytics] = useState(null)
-  const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [days, setDays] = useState(30)
@@ -44,12 +72,8 @@ function AdminAnalyticsPage() {
     setLoading(true)
     setError('')
     try {
-      const [analyticsRes, dashboardRes] = await Promise.all([
-        getAdminAnalytics({ days: selectedDays }),
-        getAdminDashboard(),
-      ])
-      setAnalytics(readResource(analyticsRes))
-      setDashboard(readResource(dashboardRes))
+      const payload = await loadAnalyticsSnapshot(selectedDays)
+      setAnalytics(payload)
     } catch {
       setError('Failed to load dashboard data.')
     } finally {
@@ -63,10 +87,10 @@ function AdminAnalyticsPage() {
   const totalRevenue = analytics?.summary?.total_revenue ?? 0
   const statusBreakdown = analytics?.status_breakdown ?? {}
   const topProducts = analytics?.top_products ?? []
-  const stats = dashboard?.stats ?? {}
+  const stats = analytics?.stats ?? {}
 
   return (
-    <div className="page-grid">
+    <div className="page-grid admin-page-grid">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <PageHeader
           eyebrow="Administration"
@@ -95,9 +119,9 @@ function AdminAnalyticsPage() {
 
           {/* All-time KPIs */}
           <section>
-            <div className="dashboard-section-label">
+            <h2 className="dashboard-section-label">
               <span>All-Time Overview</span>
-            </div>
+            </h2>
             <div className="dashboard-kpi-grid">
               <KpiCard
                 icon={ShoppingBag}
@@ -128,9 +152,9 @@ function AdminAnalyticsPage() {
 
           {/* Period KPIs */}
           <section>
-            <div className="dashboard-section-label">
+            <h2 className="dashboard-section-label">
               <span>Period Summary — {DAY_OPTIONS.find((o) => o.value === days)?.label}</span>
-            </div>
+            </h2>
             <div className="dashboard-kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
               <KpiCard
                 icon={TrendingUp}

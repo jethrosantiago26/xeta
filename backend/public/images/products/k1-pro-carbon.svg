@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">XETA K1 Pro Carbon</title>
+  <desc id="desc">Minimal product placeholder for the XETA K1 Pro keyboard.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#131418" />
+      <stop offset="100%" stop-color="#2e3238" />
+    </linearGradient>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#525760" />
+      <stop offset="100%" stop-color="#1d2026" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="64" fill="url(#bg)" />
+  <circle cx="900" cy="170" r="190" fill="#666b75" opacity="0.2" />
+  <circle cx="240" cy="760" r="220" fill="#0c0d10" opacity="0.45" />
+  <g transform="translate(145 260)">
+    <rect x="0" y="90" width="910" height="310" rx="36" fill="url(#board)" stroke="#8d929e" stroke-width="10" />
+    <g fill="#cfd3da">
+      <rect x="80" y="140" width="70" height="70" rx="12" />
+      <rect x="170" y="140" width="70" height="70" rx="12" />
+      <rect x="260" y="140" width="70" height="70" rx="12" />
+      <rect x="350" y="140" width="70" height="70" rx="12" />
+      <rect x="440" y="140" width="70" height="70" rx="12" />
+      <rect x="530" y="140" width="70" height="70" rx="12" />
+      <rect x="620" y="140" width="70" height="70" rx="12" />
+      <rect x="710" y="140" width="70" height="70" rx="12" />
+      <rect x="800" y="140" width="70" height="70" rx="12" />
+      <rect x="120" y="230" width="72" height="72" rx="12" />
+      <rect x="210" y="230" width="72" height="72" rx="12" />
+      <rect x="300" y="230" width="72" height="72" rx="12" />
+      <rect x="390" y="230" width="72" height="72" rx="12" />
+      <rect x="480" y="230" width="72" height="72" rx="12" />
+      <rect x="570" y="230" width="72" height="72" rx="12" />
+      <rect x="660" y="230" width="72" height="72" rx="12" />
+      <rect x="750" y="230" width="122" height="72" rx="12" />
+    </g>
+    <text x="0" y="520" fill="#f3f5f8" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" letter-spacing="6">XETA K1 PRO</text>
+    <text x="0" y="570" fill="#b1b6c0" font-family="Arial, Helvetica, sans-serif" font-size="28">Carbon mechanical keyboard</text>
+  </g>
+</svg>

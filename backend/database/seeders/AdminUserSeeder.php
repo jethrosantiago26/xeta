@@ -30,7 +30,6 @@ class AdminUserSeeder extends Seeder
                 'latitude' => null,
                 'longitude' => null,
                 'location_source' => 'seed',
-                'preferred_contact_method' => 'email',
             ],
         );
     }

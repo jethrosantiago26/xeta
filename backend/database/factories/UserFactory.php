@@ -39,7 +39,6 @@ class UserFactory extends Factory
             'latitude' => fake()->latitude(),
             'longitude' => fake()->longitude(),
             'location_source' => 'factory',
-            'preferred_contact_method' => 'email',
             'role' => 'customer',
         ];
     }

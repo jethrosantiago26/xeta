@@ -17,7 +17,6 @@ class SupportTicket extends Model
         'ticket_number',
         'subject',
         'type',
-        'priority',
         'status',
         'channel',
         'description',

@@ -9,79 +9,103 @@ import {
   prefetchSupportRoutes,
 } from '../../lib/routePrefetch.js'
 
+const adminCoreMenu = [
+  { to: '/admin', label: 'Overview' },
+  { to: '/admin/products', label: 'Products' },
+  { to: '/admin/support', label: 'Support' },
+]
+
+const adminCommerceMenu = [
+  { to: '/admin/orders', label: 'Orders', note: 'Queue and fulfillment' },
+  { to: '/admin/customers', label: 'Customers', note: 'Segmentation and support' },
+  { to: '/admin/inventory', label: 'Inventory', note: 'Stock and low-level alerts' },
+  { to: '/admin/reviews', label: 'Reviews', note: 'Moderation pipeline' },
+]
+
+const adminSystemMenu = [
+  { to: '/account', label: 'My Account' },
+]
+
+const customerBreadcrumbLabels = {
+  products: 'Products',
+  cart: 'Cart',
+  checkout: 'Checkout',
+  orders: 'Orders',
+  support: 'Support',
+  faq: 'FAQ',
+  account: 'Account',
+}
+
+function formatCustomerBreadcrumbLabel(segment) {
+  const decodedSegment = (() => {
+    try {
+      return decodeURIComponent(segment)
+    } catch {
+      return segment
+    }
+  })()
+
+  const normalized = decodedSegment.replace(/[-_]+/g, ' ').trim()
+
+  if (!normalized) {
+    return 'Page'
+  }
+
+  return normalized
+    .split(/\s+/)
+    .map((word) => {
+      if (word.length <= 2) {
+        return word.toUpperCase()
+      }
+
+      return `${word[0].toUpperCase()}${word.slice(1)}`
+    })
+    .join(' ')
+}
+
+function CustomerBreadcrumbs({ pathname }) {
+  if (pathname === '/' || pathname === '/sign-in' || pathname === '/post-auth') {
+    return null
+  }
+
+  const segments = pathname.split('/').filter(Boolean)
+  const crumbs = [
+    {
+      label: 'Home',
+      to: segments.length ? '/' : undefined,
+    },
+  ]
+
+  let cumulativePath = ''
+
+  segments.forEach((segment, index) => {
+    cumulativePath += `/${segment}`
+    const isLast = index === segments.length - 1
+
+    crumbs.push({
+      label: customerBreadcrumbLabels[segment] ?? formatCustomerBreadcrumbLabel(segment),
+      to: isLast ? undefined : cumulativePath,
+    })
+  })
+
+  return (
+    <div className="customer-breadcrumb-wrap">
+      <nav className="customer-breadcrumb" aria-label="Breadcrumb">
+        {crumbs.map((crumb, index) => (
+          <span key={`${crumb.label}-${index}`} className="customer-breadcrumb-item">
+            {index > 0 ? <span aria-hidden="true">/</span> : null}
+            {crumb.to ? <NavLink to={crumb.to}>{crumb.label}</NavLink> : <span aria-current="page">{crumb.label}</span>}
+          </span>
+        ))}
+      </nav>
+    </div>
+  )
+}
+
 function AppLayout() {
   const { profile, loading, isSignedIn } = useSession()
   const isAdmin = profile?.role === 'admin'
   const { isDark, toggleTheme } = useTheme()
-  const location = useLocation()
-  const [shopMenuOpen, setShopMenuOpen] = useState(false)
-  const [shopMenuPinned, setShopMenuPinned] = useState(false)
-  const shopMenuRef = useRef(null)
-  const [supportMenuOpen, setSupportMenuOpen] = useState(false)
-  const [supportMenuPinned, setSupportMenuPinned] = useState(false)
-  const supportMenuRef = useRef(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsPinned, setSettingsPinned] = useState(false)
-  const settingsMenuRef = useRef(null)
-
-  const supportMenuActive = location.pathname === '/support' || location.pathname === '/faq'
-
-  useEffect(() => {
-    function handleDocumentClick(event) {
-      if (shopMenuRef.current && !shopMenuRef.current.contains(event.target)) {
-        setShopMenuOpen(false)
-        setShopMenuPinned(false)
-      }
-
-      if (supportMenuRef.current && !supportMenuRef.current.contains(event.target)) {
-        setSupportMenuOpen(false)
-        setSupportMenuPinned(false)
-      }
-
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target)) {
-        setSettingsOpen(false)
-        setSettingsPinned(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleDocumentClick)
-
-    return () => {
-      document.removeEventListener('mousedown', handleDocumentClick)
-    }
-  }, [])
-
-  const adminCoreMenu = [
-    { to: '/admin', label: 'Overview' },
-    { to: '/admin/products', label: 'Products' },
-    { to: '/admin/support', label: 'Support' },
-  ]
-
-  const adminCommerceMenu = [
-    { to: '/admin/orders', label: 'Orders', note: 'Queue and fulfillment' },
-    { to: '/admin/customers', label: 'Customers', note: 'Segmentation and support' },
-    { to: '/admin/inventory', label: 'Inventory', note: 'Stock and low-level alerts' },
-    { to: '/admin/reviews', label: 'Reviews', note: 'Moderation pipeline' },
-  ]
-
-  const adminSystemMenu = [
-    { to: '/account', label: 'My Account' },
-  ]
-
-  function closeShopMenu() {
-    setShopMenuOpen(false)
-    setShopMenuPinned(false)
-  }
-
-  function closeSupportMenu() {
-    setSupportMenuOpen(false)
-    setSupportMenuPinned(false)
-  }
-
-  function closeSettingsMenu() {
-    setSettingsOpen(false)
-    setSettingsPinned(false)
-  }
 
   // Avoid flashing customer navigation while role is still being resolved.
   if (isSignedIn && (loading || !profile)) {
@@ -103,173 +127,167 @@ function AppLayout() {
   }
 
   if (isAdmin) {
-    return (
-      <div className="page-shell admin-shell">
-        <header className="site-header">
-          <div className="header-row">
-            <NavLink className="brand" to="/admin">
-              <strong>XETA</strong>
-            </NavLink>
-
-            <div className="actions" style={{ gap: '8px' }}>
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button type="button" className="button button-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>
-                    Sign in
-                  </button>
-                </SignInButton>
-              </SignedOut>
-              <SignedIn>
-                <div className="header-action-icons" aria-label="Quick actions">
-                  <button
-                    type="button"
-                    className="icon-nav-button"
-                    onClick={toggleTheme}
-                    aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                    title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                  >
-                    {isDark ? (
-                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                        <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M20.4 14.6A8.5 8.5 0 1 1 9.4 3.6a7 7 0 1 0 11 11Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
-            </div>
-          </div>
-        </header>
-
-        <div className="admin-frame">
-          <aside className="admin-sidebar">
-            <div className="admin-sidebar-group">
-              <p className="admin-sidebar-title">Core</p>
-              {adminCoreMenu.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/admin'}
-                  className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-
-            <div className="admin-sidebar-group">
-              <p className="admin-sidebar-title">Commerce</p>
-              {adminCommerceMenu.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
-                >
-                  <span>{item.label}</span>
-                  <small>{item.note}</small>
-                </NavLink>
-              ))}
-            </div>
-
-            <div className="admin-sidebar-group">
-              <p className="admin-sidebar-title">System</p>
-              {adminSystemMenu.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          </aside>
-
-          <main className="admin-main">
-            <Outlet />
-          </main>
-        </div>
-      </div>
-    )
+    return <AdminLayout isDark={isDark} toggleTheme={toggleTheme} />
   }
 
+  return <CustomerLayout isDark={isDark} toggleTheme={toggleTheme} />
+}
+
+function AdminLayout({ isDark, toggleTheme }) {
+  return (
+    <div className="page-shell admin-shell">
+      <header className="site-header">
+        <div className="header-row">
+          <NavLink className="brand" to="/admin">
+            <strong>XETA</strong>
+          </NavLink>
+
+          <div className="actions" style={{ gap: '8px' }}>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button type="button" className="button button-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>
+                  Sign in
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <div className="header-action-icons" aria-label="Quick actions">
+                <button
+                  type="button"
+                  className="icon-nav-button"
+                  onClick={toggleTheme}
+                  aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                  title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {isDark ? (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M20.4 14.6A8.5 8.5 0 1 1 9.4 3.6a7 7 0 1 0 11 11Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+          </div>
+        </div>
+      </header>
+
+      <div className="admin-frame">
+        <aside className="admin-sidebar">
+          <div className="admin-sidebar-group">
+            <p className="admin-sidebar-title">Core</p>
+            {adminCoreMenu.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/admin'}
+                className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+
+          <div className="admin-sidebar-group">
+            <p className="admin-sidebar-title">Commerce</p>
+            {adminCommerceMenu.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}
+              >
+                <span>{item.label}</span>
+                <small>{item.note}</small>
+              </NavLink>
+            ))}
+          </div>
+
+          <div className="admin-sidebar-group">
+            <p className="admin-sidebar-title">System</p>
+            {adminSystemMenu.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `admin-side-link${isActive ? ' active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </aside>
+
+        <main className="admin-main">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function CustomerLayout({ isDark, toggleTheme }) {
+  const location = useLocation()
+  const [supportMenuOpen, setSupportMenuOpen] = useState(false)
+  const [supportMenuPinned, setSupportMenuPinned] = useState(false)
+  const supportMenuRef = useRef(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsPinned, setSettingsPinned] = useState(false)
+  const settingsMenuRef = useRef(null)
+
+  const supportMenuActive = location.pathname === '/support' || location.pathname === '/faq'
+  const isLandingPage = location.pathname === '/'
+
+  useEffect(() => {
+    function handleDocumentClick(event) {
+      if (supportMenuRef.current && !supportMenuRef.current.contains(event.target)) {
+        setSupportMenuOpen(false)
+        setSupportMenuPinned(false)
+      }
+
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target)) {
+        setSettingsOpen(false)
+        setSettingsPinned(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleDocumentClick)
+
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentClick)
+    }
+  }, [])
+
+  function closeSupportMenu() {
+    setSupportMenuOpen(false)
+    setSupportMenuPinned(false)
+  }
+
+  function closeSettingsMenu() {
+    setSettingsOpen(false)
+    setSettingsPinned(false)
+  }
   return (
     <div className="page-shell">
-      <header className="site-header">
+      <header className={`site-header site-header-landing${isLandingPage ? ' site-header-home' : ''}`}>
         <div className="header-row customer-header-row">
           <NavLink className="brand" to="/">
             <strong>XETA</strong>
           </NavLink>
 
           <nav className="nav-links">
-            <div
-              className={`nav-dropdown${shopMenuOpen ? ' open' : ''}`}
-              ref={shopMenuRef}
-              onMouseEnter={() => {
-                prefetchShopRoutes()
-
-                if (!shopMenuPinned) {
-                  setShopMenuOpen(true)
-                }
-              }}
-              onFocusCapture={prefetchShopRoutes}
+            <NavLink
+              to="/products"
+              onMouseEnter={prefetchShopRoutes}
+              onFocus={prefetchShopRoutes}
               onTouchStart={prefetchShopRoutes}
-              onMouseLeave={() => {
-                if (!shopMenuPinned) {
-                  setShopMenuOpen(false)
-                }
-              }}
             >
-              <button
-                type="button"
-                className="nav-dropdown-trigger"
-                aria-expanded={shopMenuOpen}
-                aria-haspopup="menu"
-                onClick={() => {
-                  setShopMenuPinned((value) => {
-                    const nextPinned = !value
-                    setShopMenuOpen(nextPinned)
-
-                    if (nextPinned) {
-                      closeSupportMenu()
-                      closeSettingsMenu()
-                    }
-
-                    return nextPinned
-                  })
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    closeShopMenu()
-                  }
-                }}
-              >
-                Shop
-              </button>
-
-              {shopMenuOpen ? (
-                <div className="nav-dropdown-menu" role="menu" aria-label="Shop categories">
-                  <NavLink to="/products" role="menuitem" onClick={closeShopMenu}>
-                    All Products
-                  </NavLink>
-                  <NavLink to="/products?category=mice" role="menuitem" onClick={closeShopMenu}>
-                    Mice
-                  </NavLink>
-                  <NavLink to="/products?category=keyboards" role="menuitem" onClick={closeShopMenu}>
-                    Keyboards
-                  </NavLink>
-                  <NavLink to="/products?category=mousepads" role="menuitem" onClick={closeShopMenu}>
-                    Mouse Pads
-                  </NavLink>
-                </div>
-              ) : null}
-            </div>
+              Shop
+            </NavLink>
             <div
               className={`nav-dropdown${supportMenuOpen ? ' open' : ''}`}
               ref={supportMenuRef}
@@ -299,7 +317,6 @@ function AppLayout() {
                     setSupportMenuOpen(nextPinned)
 
                     if (nextPinned) {
-                      closeShopMenu()
                       closeSettingsMenu()
                     }
 
@@ -380,7 +397,6 @@ function AppLayout() {
                         setSettingsOpen(nextPinned)
 
                         if (nextPinned) {
-                          closeShopMenu()
                           closeSupportMenu()
                         }
 
@@ -433,7 +449,8 @@ function AppLayout() {
         </div>
       </header>
 
-      <main>
+      <main className={`customer-main${isLandingPage ? '' : ' customer-main-offset'}`}>
+        <CustomerBreadcrumbs pathname={location.pathname} />
         <Outlet />
       </main>
 
@@ -441,19 +458,19 @@ function AppLayout() {
         <div className="footer-row">
           <div>
             <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: '15px', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-primary)' }}>XETA</p>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-footer-text)', lineHeight: 1.6 }}>
               Refined peripherals for focused desks.<br />
               Clerk auth · Laravel API · Cash on delivery.
             </p>
           </div>
           <div className="footer-links">
-            <p style={{ margin: '0 0 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--color-text-muted)' }}>Explore</p>
+            <p style={{ margin: '0 0 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--color-footer-text)' }}>Explore</p>
             <NavLink to="/products">Catalog</NavLink>
             <NavLink to="/cart">Cart</NavLink>
             <NavLink to="/checkout">Checkout</NavLink>
           </div>
           <div className="footer-links">
-            <p style={{ margin: '0 0 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--color-text-muted)' }}>Account</p>
+            <p style={{ margin: '0 0 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--color-footer-text)' }}>Account</p>
             <NavLink to="/orders">Orders</NavLink>
             <NavLink to="/account">Profile</NavLink>
             <NavLink to="/settings">Settings</NavLink>

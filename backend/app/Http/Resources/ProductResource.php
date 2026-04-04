@@ -20,14 +20,33 @@ class ProductResource extends JsonResource
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
             'images' => ProductImageResource::collection($this->whenLoaded('images')),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
-            'lowest_price' => $this->whenAppended('lowest_price'),
-            'average_rating' => $this->whenAppended('average_rating'),
-            'review_count' => $this->whenAppended('review_count'),
+            'lowest_price' => $this->lowest_price,
+            'average_rating' => $this->average_rating,
+            'review_count' => $this->review_count,
             'primary_image' => $this->whenLoaded('images', function () {
                 $primary = $this->images->firstWhere('is_primary', true);
-                return $primary ? $primary->url : $this->images->first()?->url;
+                return $this->normalizeAssetUrl($primary ? $primary->url : $this->images->first()?->url);
             }),
             'created_at' => $this->created_at,
         ];
+    }
+
+    private function normalizeAssetUrl(mixed $url): ?string
+    {
+        $value = trim(str_replace('\\', '/', (string) $url));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (
+            preg_match('/^(https?:)?\\/\\//i', $value) === 1
+            || str_starts_with($value, 'data:')
+            || str_starts_with($value, 'blob:')
+        ) {
+            return $value;
+        }
+
+        return '/' . ltrim($value, '/');
     }
 }

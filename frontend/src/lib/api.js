@@ -66,8 +66,8 @@ api.interceptors.response.use(
   },
 )
 
-export async function getProducts(params = {}) {
-  return api.get('/products', { params })
+export async function getProducts(params = {}, signal = undefined) {
+  return api.get('/products', { params, signal })
 }
 
 export async function getProduct(slug) {
@@ -288,13 +288,34 @@ export function readResource(response) {
 }
 
 export function getAssetUrl(path) {
-  if (!path) return path
-  if (path.startsWith('http://') || path.startsWith('https://')) return path
-  if (path.startsWith('/')) {
-    const baseUrl = api.defaults.baseURL.replace('/api/v1', '')
-    return `${baseUrl}${path}`
+  if (!path) {
+    return path
   }
-  return path
+
+  const rawPath = String(path).trim()
+
+  if (!rawPath) {
+    return ''
+  }
+
+  if (
+    rawPath.startsWith('http://')
+    || rawPath.startsWith('https://')
+    || rawPath.startsWith('data:')
+    || rawPath.startsWith('blob:')
+    || rawPath.startsWith('//')
+  ) {
+    return rawPath
+  }
+
+  const normalizedPath = rawPath.replace(/\\/g, '/').replace(/^\.\//, '')
+  const baseUrl = api.defaults.baseURL.replace(/\/api\/v1\/?$/, '')
+
+  if (normalizedPath.startsWith('/')) {
+    return `${baseUrl}${normalizedPath}`
+  }
+
+  return `${baseUrl}/${normalizedPath}`
 }
 
 export default api

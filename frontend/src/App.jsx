@@ -64,7 +64,7 @@ function AuthBridge() {
         return getToken({ skipCache: true })
       })
 
-      const token = await getToken({ skipCache: true })
+      const token = await getToken()
 
       if (active) {
         setApiAuthToken(token)

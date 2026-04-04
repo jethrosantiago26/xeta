@@ -182,10 +182,6 @@ function OrderDetailsPanel({ order, onClose, onUpdateStatus, onArchive, onRestor
               <span className="order-detail-total-label">Shipping</span>
               <span>{formatMoney(order.shipping)}</span>
             </div>
-            <div className="order-detail-total-row">
-              <span className="order-detail-total-label">Tax</span>
-              <span>{formatMoney(order.tax)}</span>
-            </div>
             <div className="order-detail-total-row order-detail-total-grand">
               <span>Total</span>
               <span>{formatMoney(order.total)}</span>

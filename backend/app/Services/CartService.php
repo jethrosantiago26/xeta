@@ -105,14 +105,14 @@ class CartService
         $items = $this->getCart($user);
 
         $subtotal = $items->sum(fn (CartItem $item) => $item->variant->price * $item->quantity);
-        $tax = round($subtotal * 0.08, 2); // 8% tax
+        $tax = 0.0;
         $shipping = $subtotal >= 100 ? 0 : 9.99; // Free shipping over $100
 
         return [
             'subtotal' => round($subtotal, 2),
             'tax' => $tax,
             'shipping' => $shipping,
-            'total' => round($subtotal + $tax + $shipping, 2),
+            'total' => round($subtotal + $shipping, 2),
             'item_count' => $items->sum('quantity'),
         ];
     }

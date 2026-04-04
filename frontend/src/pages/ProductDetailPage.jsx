@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useSession } from '../context/SessionContext.jsx'
 import { createReview, getOrders, getProduct, readResource, updateReview } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
 import { getVariantVisual } from '../lib/variantVisuals.js'
 
+function formatSpecLabel(key) {
+  return String(key)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 function ProductDetailPage() {
   const { slug } = useParams()
+  const navigate = useNavigate()
   const { addItem } = useCart()
   const [product, setProduct] = useState(null)
   const [selectedVariantId, setSelectedVariantId] = useState('')
@@ -20,6 +29,7 @@ function ProductDetailPage() {
   // Cart Bottom Sheet state
   const [showCartSheet, setShowCartSheet] = useState(false)
   const [cartQuantity, setCartQuantity] = useState(1)
+  const [sheetAction, setSheetAction] = useState('cart')
 
   // Reviews state
   const { profile, isLoaded: sessionLoaded, isSignedIn } = useSession()
@@ -242,6 +252,30 @@ function ProductDetailPage() {
       ?? null
   }, [visualVariants, selectedVariantId])
 
+  const specEntries = useMemo(() => {
+    if (!product?.specs || typeof product.specs !== 'object') {
+      return []
+    }
+
+    return Object.entries(product.specs)
+      .filter(([, value]) => value != null && String(value).trim() !== '')
+      .map(([key, value]) => ({
+        key,
+        label: formatSpecLabel(key),
+        value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+      }))
+  }, [product?.specs])
+
+  const approvedReviews = useMemo(() => {
+    return reviews.filter((review) => review?.is_approved !== false)
+  }, [reviews])
+
+  const totalRatings = approvedReviews.length
+  const averageRating = totalRatings > 0
+    ? approvedReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / totalRatings
+    : 0
+  const roundedAverage = Math.round(averageRating)
+
   if (loading) {
     return (
       <div className="page-grid">
@@ -282,11 +316,11 @@ function ProductDetailPage() {
           <p className="lede">{product.description}</p>
           <div className="row">
             <span className="price">{formatMoney(price)}</span>
-            {product.average_rating ? (
-              <span className="status-pill">{Number(product.average_rating).toFixed(1)} / 5</span>
+            {totalRatings > 0 ? (
+              <span className="status-pill">{averageRating.toFixed(1)} / 5</span>
             ) : null}
-            {product.review_count ? (
-              <span className="status-pill warning">{product.review_count} reviews</span>
+            {totalRatings > 0 ? (
+              <span className="status-pill warning">{totalRatings} reviews</span>
             ) : null}
           </div>
 
@@ -359,11 +393,25 @@ function ProductDetailPage() {
               disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
               onClick={() => {
                 if (!selectedVariant || selectedVariant.stock_quantity === 0) return
+                setSheetAction('cart')
                 setCartQuantity(1)
                 setShowCartSheet(true)
               }}
             >
               {selectedVariant?.stock_quantity === 0 ? 'Sold Out' : 'Add to cart'}
+            </button>
+            <button
+              type="button"
+              className="button button-secondary"
+              disabled={!selectedVariant || selectedVariant.stock_quantity === 0}
+              onClick={() => {
+                if (!selectedVariant || selectedVariant.stock_quantity === 0) return
+                setSheetAction('buy')
+                setCartQuantity(1)
+                setShowCartSheet(true)
+              }}
+            >
+              {selectedVariant?.stock_quantity === 0 ? 'Sold Out' : 'Buy now'}
             </button>
             <Link className="button button-secondary" to="/cart">
               Go to cart
@@ -372,87 +420,121 @@ function ProductDetailPage() {
         </div>
       </section>
 
-      <section className="grid cards">
-        <div className="summary-card">
-          <h3>Specs</h3>
-          <div className="divider" />
-          <pre className="muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-            {JSON.stringify(product.specs ?? {}, null, 2)}
-          </pre>
-        </div>
-        <div className="summary-card">
-          <h3>Variants</h3>
-          <div className="divider" />
-          <div className="stack">
-            {visualVariants.map((variant) => (
-              <div key={variant.id} className="row" style={{ justifyContent: 'space-between' }}>
-                <span>{variant.name}</span>
-                <span>{formatMoney(variant.price)}</span>
-              </div>
-            ))}
+      <section className="grid cards product-detail-info-grid">
+        <div className="summary-card specs-card">
+          <div className="specs-card-head">
+            <p className="specs-card-kicker">Specifications</p>
+            <h3>Technical details</h3>
           </div>
+          <div className="divider" />
+          {specEntries.length > 0 ? (
+            <dl className="specs-list">
+              {specEntries.map((spec) => (
+                <div key={spec.key} className="specs-item">
+                  <dt>{spec.label}</dt>
+                  <dd>{spec.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="muted specs-empty">No specifications listed yet.</p>
+          )}
         </div>
       </section>
 
       {/* ── Reviews Section ── */}
       <section className="product-reviews-section">
         <div className="product-reviews-header">
-          <h2>Customer Reviews</h2>
-          {product.average_rating ? (
-            <div className="review-summary-stats">
-              <span className="review-summary-score">{Number(product.average_rating).toFixed(1)}</span>
-              <span className="review-summary-count">out of 5 ({product.review_count} ratings)</span>
+          <div className="product-reviews-title">
+            <h2>Customer Reviews</h2>
+            <p className="muted">Feedback from verified purchases.</p>
+          </div>
+
+          <div className="review-summary-panel" aria-label="Review summary">
+            <span className="review-summary-score">{totalRatings > 0 ? averageRating.toFixed(1) : '—'}</span>
+            <div className="review-summary-meta">
+              <div className="review-summary-stars" aria-hidden="true">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <svg key={index} className={index < roundedAverage ? 'filled' : ''} viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                ))}
+              </div>
+              <span className="review-summary-count">
+                {totalRatings > 0
+                  ? `${totalRatings} rating${totalRatings === 1 ? '' : 's'}`
+                  : 'No ratings yet'}
+              </span>
             </div>
-          ) : (
-            <p className="muted">No reviews yet.</p>
-          )}
+          </div>
         </div>
 
         <div className="reviews-layout">
           {/* Review List */}
           <div className="reviews-list">
-            {reviews.map((review) => (
-              <article key={review.id} className="review-card">
-                <div className="review-card-header">
-                  <span className="review-author">{review.author_name || 'Verified Buyer'}</span>
-                  <div className="review-stars-display">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <svg key={i} className={`star-icon ${i < review.rating ? 'filled' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                      </svg>
-                    ))}
-                  </div>
-                </div>
-                {review.variant?.name ? (
-                  <p className="muted" style={{ margin: '2px 0 8px', fontSize: '12px' }}>
-                    Variant: {review.variant.name}
-                  </p>
-                ) : null}
-                {review.comment && <p className="review-comment">{review.comment}</p>}
-                <span className="review-date">
-                  {new Date(review.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
+            {reviews.length === 0 ? (
+              <article className="review-empty-card">
+                <h3>No reviews yet</h3>
+                <p>Be the first verified buyer to share feedback on this product.</p>
               </article>
-            ))}
+            ) : (
+              reviews.map((review) => {
+                const authorName = review.author_name || 'Verified Buyer'
+
+                return (
+                  <article key={review.id} className="review-card">
+                    <div className="review-card-header">
+                      <div className="review-author-group">
+                        <span className="review-avatar">{authorName.charAt(0).toUpperCase()}</span>
+                        <div className="review-author-meta">
+                          <span className="review-author">{authorName}</span>
+                          <span className="review-date">
+                            {new Date(review.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="review-stars-display" aria-label={`Rated ${review.rating} out of 5`}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <svg key={i} className={`star-icon ${i < review.rating ? 'filled' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        ))}
+                      </div>
+                    </div>
+
+                    {review.variant?.name ? (
+                      <span className="review-variant-pill">{review.variant.name}</span>
+                    ) : null}
+
+                    <p className={`review-comment${review.comment ? '' : ' review-comment-empty'}`}>
+                      {review.comment || 'No written comment provided.'}
+                    </p>
+                  </article>
+                )
+              })
+            )}
           </div>
 
           {/* Write Review Form */}
           <div className="review-form-container">
             {!isSignedIn ? (
               <div className="review-notice-card">
-                <p>Sign in to write a review.</p>
+                <h3>Write a review</h3>
+                <p>Sign in to leave feedback after purchase.</p>
                 <Link className="button button-secondary" to="/account">Sign In</Link>
               </div>
             ) : orderedVariantChoices.length === 0 ? (
               <div className="review-notice-card disabled">
-                <p>You can only review variants you have purchased.</p>
+                <h3>Write a review</h3>
+                <p>You can submit a review after purchasing this product.</p>
               </div>
             ) : (
-              <div className="stack" style={{ gap: '12px' }}>
-                <label className="stack" style={{ gap: '6px' }}>
-                  <span className="muted" style={{ fontSize: '12px' }}>Select purchased variant</span>
+              <div className="review-form-card">
+                <label className="review-field">
+                  <span className="review-field-label">Select purchased variant</span>
                   <select
-                    className="select"
+                    className="select review-select"
                     value={reviewVariantId}
                     onChange={(event) => setReviewVariantId(event.target.value)}
                     required
@@ -466,100 +548,96 @@ function ProductDetailPage() {
                 </label>
 
                 {selectedVariantReview && !isEditingReview ? (
-              <div className="review-notice-card success" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <h3 style={{ margin: '0 0 4px 0', fontSize: '15px' }}>Your Review</h3>
-                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                    You have already reviewed this variant.
-                  </p>
-                </div>
+                  <div className="review-notice-card success">
+                    <h3>Your review</h3>
+                    <p>You already reviewed this variant.</p>
 
-                <div style={{ backgroundColor: 'var(--color-surface)', padding: '16px', borderRadius: '12px', width: '100%', border: '1px solid var(--color-border)', textAlign: 'center' }}>
-                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', marginBottom: '12px', color: 'var(--color-accent)' }}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <svg key={i} width="16" height="16" viewBox="0 0 24 24" fill={i < selectedVariantReview.rating ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={i < selectedVariantReview.rating ? '0' : '2'}>
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                      </svg>
-                    ))}
-                  </div>
-                  <p style={{ margin: 0, fontSize: '14px', fontStyle: selectedVariantReview.comment ? 'normal' : 'italic', color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
-                    {selectedVariantReview.comment || 'No written comment provided.'}
-                  </p>
-                </div>
+                    <div className="review-existing-content">
+                      <div className="review-existing-stars" aria-hidden="true">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <svg key={i} viewBox="0 0 24 24" fill={i < selectedVariantReview.rating ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={i < selectedVariantReview.rating ? '0' : '2'}>
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        ))}
+                      </div>
 
-                <button type="button" className="button button-secondary" onClick={() => setIsEditingReview(true)}>
-                  Edit your review
-                </button>
-              </div>
-            ) : (
-              <form className="review-form" onSubmit={handleReviewSubmit}>
-                <h3>{selectedVariantReview ? 'Update your review' : 'Write a review'}</h3>
-                <p className="muted" style={{ fontSize: '13px', marginTop: '-4px' }}>
-                  {selectedVariantReview
-                    ? 'Edit the stars and text below for this variant.'
-                    : 'Share your thoughts about this purchased variant.'}
-                </p>
+                      <p className={`review-existing-comment${selectedVariantReview.comment ? '' : ' empty'}`}>
+                        {selectedVariantReview.comment || 'No written comment provided.'}
+                      </p>
+                    </div>
 
-                {reviewError && <div className="notice error">{reviewError}</div>}
-
-                <div className="star-rating-selector">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const ratingValue = i + 1
-                    return (
-                      <button
-                        key={ratingValue}
-                        type="button"
-                        className={`star-select-btn ${ratingValue <= reviewForm.rating ? 'active' : ''}`}
-                        onClick={() => setReviewForm(curr => ({ ...curr, rating: ratingValue }))}
-                      >
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <textarea
-                  className="textarea"
-                  placeholder="What did you like or dislike?"
-                  value={reviewForm.comment}
-                  onChange={(e) => setReviewForm(curr => ({ ...curr, comment: e.target.value }))}
-                  required
-                />
-
-                <div className="checkbox-field" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                  <input
-                    type="checkbox"
-                    id="is_anonymous"
-                    checked={reviewForm.is_anonymous}
-                    onChange={(e) => setReviewForm(curr => ({ ...curr, is_anonymous: e.target.checked }))}
-                    style={{ accentColor: 'var(--brand-500)', width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="is_anonymous" style={{ fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer', userSelect: 'none' }}>
-                    Post anonymously
-                  </label>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="submit" className="button button-primary" disabled={submittingReview}>
-                    {submittingReview ? 'Submitting...' : (selectedVariantReview ? 'Update review' : 'Submit review')}
-                  </button>
-                  {selectedVariantReview && (
-                    <button type="button" className="button button-secondary" disabled={submittingReview} onClick={() => setIsEditingReview(false)}>
-                      Cancel
+                    <button type="button" className="button button-secondary" onClick={() => setIsEditingReview(true)}>
+                      Edit your review
                     </button>
-                  )}
-                </div>
-              </form>
-            )}
+                  </div>
+                ) : (
+                  <form className="review-form" onSubmit={handleReviewSubmit}>
+                    <h3>{selectedVariantReview ? 'Update your review' : 'Write a review'}</h3>
+                    <p className="review-form-subtitle">
+                      {selectedVariantReview
+                        ? 'Edit your rating and comment for this variant.'
+                        : 'Share your thoughts about this purchased variant.'}
+                    </p>
+
+                    {reviewError && <div className="notice error">{reviewError}</div>}
+
+                    <div className="star-rating-selector" role="radiogroup" aria-label="Choose rating">
+                      {Array.from({ length: 5 }).map((_, i) => {
+                        const ratingValue = i + 1
+
+                        return (
+                          <button
+                            key={ratingValue}
+                            type="button"
+                            className={`star-select-btn ${ratingValue <= reviewForm.rating ? 'active' : ''}`}
+                            onClick={() => setReviewForm(curr => ({ ...curr, rating: ratingValue }))}
+                            aria-label={`Rate ${ratingValue} star${ratingValue > 1 ? 's' : ''}`}
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <textarea
+                      className="textarea review-textarea"
+                      placeholder="What did you like or dislike?"
+                      value={reviewForm.comment}
+                      onChange={(e) => setReviewForm(curr => ({ ...curr, comment: e.target.value }))}
+                      required
+                    />
+
+                    <label className="review-anonymous-field" htmlFor="is_anonymous">
+                      <input
+                        type="checkbox"
+                        id="is_anonymous"
+                        checked={reviewForm.is_anonymous}
+                        onChange={(e) => setReviewForm(curr => ({ ...curr, is_anonymous: e.target.checked }))}
+                      />
+                      <span>Post anonymously</span>
+                    </label>
+
+                    <div className="review-form-actions">
+                      <button type="submit" className="button button-primary" disabled={submittingReview}>
+                        {submittingReview ? 'Submitting...' : (selectedVariantReview ? 'Update review' : 'Submit review')}
+                      </button>
+                      {selectedVariantReview ? (
+                        <button type="button" className="button button-secondary" disabled={submittingReview} onClick={() => setIsEditingReview(false)}>
+                          Cancel
+                        </button>
+                      ) : null}
+                    </div>
+                  </form>
+                )}
               </div>
             )}
           </div>
         </div>
       </section>
 
-      {/* ── Add to Cart Bottom Sheet Drawer ── */}
+      {/* ── Cart and Buy Bottom Sheet Drawer ── */}
       {selectedVariant && createPortal(
         <div 
           className={`cart-bottom-sheet-backdrop ${showCartSheet ? 'open' : ''}`}
@@ -631,17 +709,29 @@ function ProductDetailPage() {
 
                 try {
                   await addItem(selectedVariant.id, cartQuantity)
+                  if (sheetAction === 'buy') {
+                    setShowCartSheet(false)
+                    navigate('/checkout')
+                    return
+                  }
+
                   setActionMessage(`Added ${cartQuantity} item${cartQuantity > 1 ? 's' : ''} to cart.`)
                   setShowCartSheet(false)
-                } catch (error) {
-                  setActionError('Sign in first to add this item to your cart.')
+                } catch {
+                  setActionError(sheetAction === 'buy'
+                    ? 'Sign in first to buy this item now.'
+                    : 'Sign in first to add this item to your cart.')
                   setShowCartSheet(false)
                 } finally {
                   setAdding(false)
                 }
               }}
             >
-              {adding ? 'Adding to cart...' : `Add to cart — ${formatMoney(price * cartQuantity)}`}
+              {adding
+                ? (sheetAction === 'buy' ? 'Preparing checkout...' : 'Adding to cart...')
+                : (sheetAction === 'buy'
+                  ? `Buy now — ${formatMoney(price * cartQuantity)}`
+                  : `Add to cart — ${formatMoney(price * cartQuantity)}`)}
             </button>
           </div>
         </div>,

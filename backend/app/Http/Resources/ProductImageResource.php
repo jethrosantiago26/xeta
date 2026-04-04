@@ -11,10 +11,29 @@ class ProductImageResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'url' => $this->url,
+            'url' => $this->normalizeAssetUrl($this->url),
             'alt_text' => $this->alt_text,
             'sort_order' => $this->sort_order,
             'is_primary' => $this->is_primary,
         ];
+    }
+
+    private function normalizeAssetUrl(mixed $url): ?string
+    {
+        $value = trim(str_replace('\\', '/', (string) $url));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (
+            preg_match('/^(https?:)?\\/\\//i', $value) === 1
+            || str_starts_with($value, 'data:')
+            || str_starts_with($value, 'blob:')
+        ) {
+            return $value;
+        }
+
+        return '/' . ltrim($value, '/');
     }
 }

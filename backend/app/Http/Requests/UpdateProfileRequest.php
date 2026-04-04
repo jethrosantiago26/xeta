@@ -26,7 +26,6 @@ class UpdateProfileRequest extends FormRequest
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'location_source' => ['nullable', 'string', 'max:50'],
-            'preferred_contact_method' => ['nullable', 'in:email,phone,whatsapp'],
         ];
     }
 }

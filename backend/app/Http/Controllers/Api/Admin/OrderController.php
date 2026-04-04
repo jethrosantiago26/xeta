@@ -35,6 +35,10 @@ class OrderController extends Controller
         $orders = Order::withTrashed()->whereIn('id', $orderIds)->get();
 
         foreach ($orders as $order) {
+            if (!$order instanceof Order) {
+                continue;
+            }
+
             if (str_starts_with($action, 'status_')) {
                 $status = str_replace('status_', '', $action);
                 $this->orderService->updateStatus($order, $status);
@@ -76,7 +80,7 @@ class OrderController extends Controller
 
         return response()->json([
             'message' => 'Order status updated',
-            'order' => new OrderResource($orderModel->load('items.variant.product.images')),
+            'order' => new OrderResource($orderModel->load(['user', 'items.variant.product.images'])),
         ]);
     }
 
@@ -98,7 +102,7 @@ class OrderController extends Controller
         $orderModel->restore();
         return response()->json([
             'message' => 'Order restored',
-            'order' => new OrderResource($orderModel->load('items.variant.product.images')),
+            'order' => new OrderResource($orderModel->load(['user', 'items.variant.product.images'])),
         ]);
     }
 

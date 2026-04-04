@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Http\Resources\ProductResource;
 use App\Services\ProductService;
+use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -21,16 +22,50 @@ class ProductController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $filters = $request->only([
-            'category', 'min_price', 'max_price',
+            'category', 'categories', 'min_price', 'max_price',
             'in_stock', 'search', 'sort',
         ]);
+        $categorySlugs = $this->extractCategorySlugs($filters);
 
         $products = $this->productService->getProducts(
             $filters,
             $request->integer('per_page', 12),
         );
 
-        return ProductResource::collection($products);
+        $boundsQuery = ProductVariant::query()
+            ->active()
+            ->where('condition', 'new')
+            ->whereHas('product', function ($query) use ($filters, $categorySlugs) {
+                $query->active();
+
+                if (!empty($categorySlugs)) {
+                    $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->whereIn('slug', $categorySlugs));
+                }
+
+                if (!empty($filters['search'])) {
+                    $query->where('name', 'like', '%' . $filters['search'] . '%');
+                }
+            });
+
+        if (!empty($filters['in_stock'])) {
+            $boundsQuery->inStock();
+        }
+
+        // Intentionally ignore min_price/max_price when computing bounds
+        // so users can widen or reset the slider range.
+        $minPrice = (clone $boundsQuery)->min('price');
+        $maxPrice = (clone $boundsQuery)->max('price');
+
+        $priceBounds = [
+            'min' => $minPrice !== null ? (float) $minPrice : 0,
+            'max' => $maxPrice !== null ? (float) $maxPrice : 0,
+        ];
+
+        return ProductResource::collection($products)->additional([
+            'meta' => [
+                'price_bounds' => $priceBounds,
+            ],
+        ]);
     }
 
     /**
@@ -40,5 +75,25 @@ class ProductController extends Controller
     {
         $product = $this->productService->getBySlug($slug);
         return new ProductResource($product);
+    }
+
+    private function extractCategorySlugs(array $filters): array
+    {
+        $rawCategories = $filters['categories'] ?? ($filters['category'] ?? []);
+
+        if (is_string($rawCategories)) {
+            $rawCategories = explode(',', $rawCategories);
+        }
+
+        if (!is_array($rawCategories)) {
+            $rawCategories = [$rawCategories];
+        }
+
+        $slugs = array_map(
+            static fn ($value) => trim((string) $value),
+            $rawCategories,
+        );
+
+        return array_values(array_unique(array_filter($slugs)));
     }
 }

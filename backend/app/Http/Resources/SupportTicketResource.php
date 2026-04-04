@@ -14,7 +14,6 @@ class SupportTicketResource extends JsonResource
             'ticket_number' => $this->ticket_number,
             'subject' => $this->subject,
             'type' => $this->type,
-            'priority' => $this->priority,
             'status' => $this->status,
             'channel' => $this->channel,
             'description' => $this->description,

@@ -1,235 +1,546 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import ProductCard from '../components/ProductCard.jsx'
-import { getCategories, getProducts, readResource } from '../lib/api.js'
+import {
+  getAssetUrl,
+  getProduct,
+  getProducts,
+  readResource,
+} from '../lib/api.js'
+import { formatMoney } from '../lib/format.js'
+import './HomePage.css'
 
-const TABS = ['Top Gears', 'Best Sellers', 'New Releases']
+const TRENDING_TABS = [
+  { value: 'top-gears', label: 'Top Gears' },
+  { value: 'best-sellers', label: 'Best Sellers' },
+  { value: 'new-releases', label: 'New Releases' },
+]
+
+const HERO_BANNERS = [
+  '/images/gemini-landing.png',
+  '/images/gemini-banner-secondary.png',
+]
+
+const TECH_FEATURES = [
+  {
+    title: 'Adjustable Actuation',
+    description: 'Customize response points for fast peeks, quick strafes, and cleaner movement control.',
+  },
+  {
+    title: 'Rapid Trigger Ready',
+    description: 'Dynamic key travel sensing keeps inputs immediate during high-pressure competitive rounds.',
+  },
+  {
+    title: 'Long-Term Durability',
+    description: 'Precision components and strict QC keep switches crisp through long grind sessions.',
+  },
+]
+
+function resolveImageUrl(product) {
+  const normalizePath = (value) => {
+    if (typeof value !== 'string') {
+      return null
+    }
+
+    const sanitized = value.trim().replace(/\\/g, '/')
+
+    if (!sanitized) {
+      return null
+    }
+
+    if (sanitized.startsWith('data:')) {
+      return sanitized
+    }
+
+    return getAssetUrl(sanitized)
+  }
+
+  const variantCandidates = Array.isArray(product?.variants)
+    ? product.variants.flatMap((variant) => [
+        variant?.image_url,
+        variant?.image,
+        variant?.attributes?.image_url,
+        variant?.attributes?.image,
+        variant?.attributes?.preview_image,
+      ])
+    : []
+
+  const galleryCandidates = Array.isArray(product?.images)
+    ? product.images.map((image) => image?.url)
+    : []
+
+  const imageCandidates = [
+    product?.primary_image,
+    product?.thumbnail,
+    product?.image_url,
+    ...galleryCandidates,
+    ...variantCandidates,
+  ]
+
+  for (const candidate of imageCandidates) {
+    const resolved = normalizePath(candidate)
+
+    if (resolved) {
+      return resolved
+    }
+  }
+
+  return null
+}
+
+function sortByRating(left, right) {
+  const leftRating = Number(left?.average_rating ?? 0)
+  const rightRating = Number(right?.average_rating ?? 0)
+
+  if (rightRating !== leftRating) {
+    return rightRating - leftRating
+  }
+
+  return Number(right?.review_count ?? 0) - Number(left?.review_count ?? 0)
+}
+
+function sortByRecency(left, right) {
+  return new Date(right?.created_at ?? 0).getTime() - new Date(left?.created_at ?? 0).getTime()
+}
+
+function resolveReviewPayload(payload) {
+  if (!payload) {
+    return null
+  }
+
+  if (payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+    return payload.data
+  }
+
+  return payload
+}
 
 function HomePage() {
-  const [featuredProducts, setFeaturedProducts] = useState([])
-  const [categories, setCategories] = useState([])
-  const [activeTab, setActiveTab] = useState('Top Gears')
+  const [products, setProducts] = useState([])
+  const [testimonials, setTestimonials] = useState([])
+  const [activeTab, setActiveTab] = useState(TRENDING_TABS[0].value)
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0)
+  const [activeInsightId, setActiveInsightId] = useState('switch-tech')
+  const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
-    let active = true
+    let mounted = true
 
-    async function loadHomeData() {
+    async function loadLandingData() {
       try {
-        const [productsResponse, categoriesResponse] = await Promise.all([
-          getProducts({ per_page: 6, sort: 'latest' }),
-          getCategories(),
-        ])
+        const productsResponse = await getProducts({ per_page: 12, sort: 'newest' })
 
         const productsPayload = readResource(productsResponse)
-        const categoriesPayload = readResource(categoriesResponse)
 
-        if (active) {
-          setFeaturedProducts(productsPayload.data ?? [])
-          setCategories(categoriesPayload.data ?? [])
+        const loadedProducts = Array.isArray(productsPayload?.data)
+          ? productsPayload.data
+          : []
+
+        if (!mounted) {
+          return
+        }
+
+        setProducts(loadedProducts)
+        setLoadFailed(false)
+
+        const testimonialCandidates = [...loadedProducts]
+          .sort(sortByRating)
+          .slice(0, 3)
+
+        if (testimonialCandidates.length === 0) {
+          setTestimonials([])
+          return
+        }
+
+        const testimonialResults = await Promise.all(
+          testimonialCandidates.map(async (candidate, index) => {
+            try {
+              const detailResponse = await getProduct(candidate.slug)
+              const detailPayload = resolveReviewPayload(readResource(detailResponse))
+              const productDetail = detailPayload || candidate
+              const reviews = Array.isArray(productDetail?.reviews)
+                ? productDetail.reviews
+                : []
+              const reviewWithComment = reviews.find(
+                (review) => typeof review.comment === 'string' && review.comment.trim() !== '',
+              )
+
+              if (!reviewWithComment) {
+                return null
+              }
+
+              const rating = Math.max(
+                1,
+                Math.min(5, Math.round(Number(reviewWithComment.rating ?? candidate.average_rating ?? 5))),
+              )
+
+              return {
+                id: reviewWithComment.id || `review-${candidate.id}-${index}`,
+                quote: `"${reviewWithComment.comment}"`,
+                author: reviewWithComment.author_name || 'Verified Buyer',
+                role: reviewWithComment.variant?.name || productDetail.category?.name || 'XETA Customer',
+                rating,
+              }
+            } catch {
+              return null
+            }
+          }),
+        )
+
+        if (mounted) {
+          setTestimonials(testimonialResults.filter(Boolean).slice(0, 3))
         }
       } catch {
-        if (active) {
-          setFeaturedProducts([])
-          setCategories([])
+        if (!mounted) {
+          return
         }
+
+        setProducts([])
+        setTestimonials([])
+        setLoadFailed(true)
       }
     }
 
-    loadHomeData()
+    loadLandingData()
 
     return () => {
-      active = false
+      mounted = false
     }
   }, [])
 
-  const heroProduct = featuredProducts[0]
-  const trendingProducts = featuredProducts.slice(0, 5)
+  useEffect(() => {
+    if (HERO_BANNERS.length < 2) {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setActiveBannerIndex((current) => (current + 1) % HERO_BANNERS.length)
+    }, 6500)
+
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  const topGears = useMemo(() => [...products].sort(sortByRating), [products])
+  const bestSellers = useMemo(
+    () => [...products].sort((left, right) => Number(right.review_count ?? 0) - Number(left.review_count ?? 0)),
+    [products],
+  )
+  const newReleases = useMemo(() => [...products].sort(sortByRecency), [products])
+
+  const productsByTab = useMemo(
+    () => ({
+      'top-gears': topGears,
+      'best-sellers': bestSellers,
+      'new-releases': newReleases,
+    }),
+    [bestSellers, newReleases, topGears],
+  )
+
+  const activeTrendingProducts = (productsByTab[activeTab] || []).slice(0, 3)
+  const technicalSpotlightImage = resolveImageUrl(topGears[1] || topGears[0])
+  const featureShowcaseProduct = topGears.find((product) => Boolean(resolveImageUrl(product)))
+    || bestSellers.find((product) => Boolean(resolveImageUrl(product)))
+    || newReleases.find((product) => Boolean(resolveImageUrl(product)))
+    || null
+  const featureShowcaseImage = resolveImageUrl(featureShowcaseProduct)
+  const featureShowcasePrice = Number(featureShowcaseProduct?.lowest_price ?? featureShowcaseProduct?.variants?.[0]?.price ?? 0)
+
+  const featureInsights = useMemo(
+    () => [
+      {
+        id: 'switch-tech',
+        title: 'Next-Gen Magnetic Switch Technology (Hall Effect)',
+        lead: `Unrivaled precision with ${featureShowcaseProduct?.name || 'XETA flagship'} calibration`,
+        description: `Built for consistency in fast matches with tight actuation control and dependable trigger response at ${featureShowcasePrice > 0 ? formatMoney(featureShowcasePrice) : 'competitive'} pricing.`,
+      },
+      {
+        id: 'rapid-trigger',
+        title: 'Rapid Trigger & Dynamic Actuation',
+        lead: 'Responsive release tracking with cleaner counter-strafes',
+        description: 'Rapid trigger behavior is tuned for competitive pacing so movement and click timing stay sharp under pressure.',
+      },
+      {
+        id: 'acoustics',
+        title: 'Exceptional Feel & Acoustic Engineering',
+        lead: 'Balanced sound profile for long sessions',
+        description: 'Layered internal damping and structural control deliver a refined key feel and less harsh resonance on repeated input.',
+      },
+      {
+        id: 'build',
+        title: 'Crafted To Perfection: All-Aluminum Build',
+        lead: 'Rigid chassis designed for stability',
+        description: 'Precision-machined metal housings improve typing stability, reduce flex, and keep the board grounded during heavy use.',
+      },
+      {
+        id: 'software',
+        title: 'XETA HUB & RGB Customization',
+        lead: 'Control profiles without clutter',
+        description: 'Create profiles for play and work, tune per-key behavior, and save settings for quick switching across setups.',
+      },
+    ],
+    [featureShowcasePrice, featureShowcaseProduct?.name],
+  )
+
+  const reviewCards = testimonials
 
   return (
-    <div className="page-grid">
-
-      {/* ── HERO — full-bleed dark like PDF slides 1–4 ── */}
-      <section className="hero-panel home-hero">
-        <div className="hero-copy">
-          <span className="hero-tag">Designed for serious desks</span>
-          <div className="stack">
-            <h1>Peripheral systems with a quieter kind of confidence.</h1>
-            <p className="lede">
-              XETA pairs Clerk authentication, a Laravel-backed commerce flow,
-              and a cash on delivery checkout with an editorial storefront that
-              keeps the focus on the products.
-            </p>
-          </div>
-
-          <div className="hero-meta">
-            <div className="hero-strap">
-              <span className="status-pill">Cash on delivery</span>
-              <span className="status-pill warning">Limited inventory drops</span>
-              <span className="chip">Precision keyboards</span>
-              <span className="chip">Gaming mice</span>
-            </div>
-          </div>
-
-          <div className="actions">
-            <Link className="button button-primary" to="/products">
-              Explore the catalog
-            </Link>
-            <Link className="button button-secondary" to="/checkout">
-              Continue to checkout
-            </Link>
-          </div>
-
-          <div className="metric-strip">
-            <div className="metric-card">
-              <strong>{categories.length || '—'}</strong>
-              <p className="muted">Categories</p>
-            </div>
-            <div className="metric-card">
-              <strong>{featuredProducts.length || '—'}</strong>
-              <p className="muted">Products loaded</p>
-            </div>
-            <div className="metric-card">
-              <strong>COD</strong>
-              <p className="muted">Pay at delivery</p>
-            </div>
-          </div>
+    <div className="landing-home">
+      <section className="landing-hero" aria-label="Featured products banner">
+        <div className="landing-hero-slides" aria-hidden="true">
+          {HERO_BANNERS.map((imagePath, index) => (
+            <div
+              key={imagePath}
+              className={`landing-hero-slide${index === activeBannerIndex ? ' active' : ''}`}
+              style={{ backgroundImage: `url(${imagePath})` }}
+            />
+          ))}
         </div>
+        <div className="landing-hero-overlay" />
 
-        <aside className="hero-visual">
-          <div className="hero-frame">
-            {heroProduct ? (
-              <img
-                src={heroProduct.primary_image || heroProduct.images?.[0]?.url || '/vite.svg'}
-                alt={heroProduct.name}
-              />
+        {HERO_BANNERS.length > 1 ? (
+          <>
+            <div className="landing-hero-indicators" role="tablist" aria-label="Banner slides">
+              {HERO_BANNERS.map((imagePath, index) => (
+                <button
+                  key={`indicator-${imagePath}`}
+                  type="button"
+                  className={index === activeBannerIndex ? 'active' : ''}
+                  onClick={() => setActiveBannerIndex(index)}
+                  aria-label={`Show banner ${index + 1}`}
+                  aria-selected={index === activeBannerIndex}
+                  role="tab"
+                />
+              ))}
+            </div>
+
+            <div className="landing-hero-nav" aria-label="Banner navigation">
+              <button
+                type="button"
+                className="landing-hero-nav-button"
+                onClick={() => {
+                  setActiveBannerIndex((current) => (current - 1 + HERO_BANNERS.length) % HERO_BANNERS.length)
+                }}
+                aria-label="Previous banner"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M14.5 6 8.5 12l6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="landing-hero-nav-button"
+                onClick={() => {
+                  setActiveBannerIndex((current) => (current + 1) % HERO_BANNERS.length)
+                }}
+                aria-label="Next banner"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M9.5 6 15.5 12l-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      <section className="landing-section landing-section-surface" aria-labelledby="trending-title">
+        <div className="landing-container">
+          <div className="landing-section-header">
+            <div>
+              <h2 id="trending-title">Trending Gear</h2>
+              <p>Curated from live product inventory and shopper activity.</p>
+            </div>
+            <Link to="/products" className="landing-section-link">
+              View All Collection
+            </Link>
+          </div>
+
+          <div className="landing-tab-row" role="tablist" aria-label="Trending categories">
+            {TRENDING_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.value}
+                className={activeTab === tab.value ? 'active' : ''}
+                onClick={() => setActiveTab(tab.value)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="landing-product-grid" key={activeTab}>
+            {activeTrendingProducts.length > 0 ? (
+              activeTrendingProducts.map((product) => {
+                const price = Number(product.lowest_price ?? product.variants?.[0]?.price ?? 0)
+                const compareAtPrice = Number(product.variants?.[0]?.compare_at_price ?? 0)
+                const imageUrl = resolveImageUrl(product)
+
+                return (
+                  <article key={product.id} className="landing-product-card">
+                    <div className="landing-product-image-wrap">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={product.name} loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="landing-image-fallback" aria-hidden="true" />
+                      )}
+                      <span className="landing-product-badge">
+                        {Number(product.average_rating ?? 0) >= 4.8
+                          ? 'Elite Rated'
+                          : Number(product.review_count ?? 0) >= 5
+                            ? 'Community Pick'
+                            : 'New Drop'}
+                      </span>
+                    </div>
+
+                    <div className="landing-product-content">
+                      <p>{product.category?.name || 'Peripherals'}</p>
+                      <h3>{product.name}</h3>
+                      <small>{product.variants?.[0]?.name || 'Performance tuned variant'}</small>
+
+                      <div className="landing-product-price-row">
+                        <strong>{price > 0 ? formatMoney(price) : 'Coming Soon'}</strong>
+                        {compareAtPrice > price ? <span>{formatMoney(compareAtPrice)}</span> : null}
+                      </div>
+
+                      <Link className="landing-product-action" to={`/products/${product.slug}`} aria-label={`Open ${product.name}`}>
+                        +
+                      </Link>
+                    </div>
+                  </article>
+                )
+              })
             ) : (
-              <div className="hero-annotation" style={{ minHeight: '240px', display: 'grid', alignContent: 'center' }}>
-                <p className="kicker">Featured drop</p>
-                <h3 className="hero-title">New arrivals appear here.</h3>
-                <p className="muted">
-                  The home screen is ready for product imagery once inventory is live.
-                </p>
-              </div>
+              <p className="landing-empty">Products will appear here as soon as inventory is available.</p>
             )}
           </div>
+        </div>
+      </section>
 
-          <div className="hero-annotation">
-            <p className="kicker">Built for clarity</p>
-            <h3 className="hero-title">A storefront that reads like a product catalog.</h3>
-            <p className="muted">
-              No payment clutter, no noisy banners. Structure is intentionally minimal
-              so the image, pricing, and product name do the work.
+      <section className="landing-section landing-section-tech" aria-labelledby="technology-title">
+        <div className="landing-container landing-tech-layout">
+          <div className="landing-tech-visual">
+            {technicalSpotlightImage ? (
+              <img src={technicalSpotlightImage} alt={topGears[1]?.name || topGears[0]?.name || 'XETA product close-up'} loading="lazy" decoding="async" />
+            ) : (
+              <div className="landing-image-fallback" aria-hidden="true" />
+            )}
+
+            <div className="landing-tech-stat">
+              <strong>0.1ms</strong>
+              <span>Industry-leading response target</span>
+            </div>
+          </div>
+
+          <div className="landing-tech-copy">
+            <p className="landing-overline">Engineered Performance</p>
+            <h2 id="technology-title">Next-Gen Magnetic Switch Technology</h2>
+            <p>
+              A cleaner signal path, tighter tolerances, and better software tuning create consistency from the
+              first click to the last round.
             </p>
-          </div>
-        </aside>
-      </section>
 
-      {/* ── TRENDING CONTENT — tab row matching PDF ── */}
-      <section className="content-card">
-        <div style={{ marginBottom: '4px' }}>
-          <p className="eyebrow-inline">Trending Content</p>
-        </div>
-
-        {/* Tab row — exactly like PDF "Top Gears / Best Sellers / New Releases" */}
-        <div className="tab-row">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={`tab-btn${activeTab === tab ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div
-          className="grid products"
-          style={{ marginTop: '4px', animation: 'fadeUp 0.35s cubic-bezier(0,0,0.2,1) both' }}
-          key={activeTab}
-        >
-          {trendingProducts.length > 0
-            ? trendingProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))
-            : Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="product-card" style={{ minHeight: '280px' }}>
-                  <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '10px', background: 'rgba(255,255,255,0.04)' }} />
-                  <div className="stack" style={{ marginTop: '14px', gap: '8px' }}>
-                    <div style={{ height: '10px', width: '60%', borderRadius: '4px', background: 'rgba(255,255,255,0.06)' }} />
-                    <div style={{ height: '14px', width: '80%', borderRadius: '4px', background: 'rgba(255,255,255,0.06)' }} />
-                    <div style={{ height: '10px', width: '40%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)' }} />
-                  </div>
-                </div>
-              ))}
-        </div>
-      </section>
-
-      {/* ── FEATURE ACCORDION SECTION — like PDF left panel ── */}
-      <section className="content-card">
-        <div className="section-label">
-          <div>
-            <p className="eyebrow-inline">Why XETA</p>
-            <h2>Clean structure, fast routing, and a more considered retail feel.</h2>
-          </div>
-          <div className="section-rule" aria-hidden="true" />
-        </div>
-
-        <div className="feature-grid">
-          {[
-            { title: 'Next-Gen Hall Effect Technology', body: 'Magnetic switch technology provides unmatched precision with zero contact wear.' },
-            { title: 'Rapid Trigger & Dynamic Actuation', body: 'Customize actuation points with sub-millisecond response for competitive play.' },
-            { title: 'Exceptional Feel & Acoustic Engineering', body: 'Every keystroke is tuned for a premium tactile and acoustic experience.' },
-            { title: 'Crafted to Perfection: All-Aluminum Build', body: 'Aircraft-grade aluminum construction built for endurance and premium aesthetics.' },
-          ].map(({ title, body }) => (
-            <article key={title} className="feature-card">
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* ── PHOTO GALLERY STRIP — "They are Just for You" from PDF ── */}
-      <section className="content-card">
-        <div className="section-label">
-          <div>
-            <p className="eyebrow-inline">Catalog notes</p>
-            <h2>Built for desks that want to feel assembled, not decorated.</h2>
-          </div>
-          <div className="section-rule" aria-hidden="true" />
-        </div>
-
-        <p className="muted" style={{ marginBottom: '20px' }}>
-          Browse categories, compare products, and move through checkout without
-          losing the visual rhythm of the page.
-        </p>
-
-        <div className="closing-band">
-          <div>
-            <div className="category-cloud">
-              {categories.slice(0, 6).map((category) => (
-                <Link key={category.id} className="category-chip" to={`/products?category=${category.slug}`}>
-                  {category.name}
-                </Link>
+            <div className="landing-tech-feature-list">
+              {TECH_FEATURES.map((feature) => (
+                <article key={feature.title}>
+                  <h3>{feature.title}</h3>
+                  <p>{feature.description}</p>
+                </article>
               ))}
             </div>
           </div>
-          <div className="actions">
-            <Link className="button button-primary" to="/products">
-              Browse all products
-            </Link>
-            <Link className="button button-secondary" to="/cart">
-              View cart
-            </Link>
+        </div>
+      </section>
+
+      <section className="landing-section" aria-labelledby="feedback-title">
+        <div className="landing-container">
+          <div className="landing-section-header landing-center-head">
+            <div>
+              <h2 id="feedback-title">Elite Player Feedback</h2>
+              <p>Built from product review data with verified-buyer sentiment.</p>
+            </div>
+          </div>
+
+          <div className="landing-review-grid">
+            {reviewCards.length > 0 ? (
+              reviewCards.map((review) => (
+                <article key={review.id} className="landing-review-card">
+                  <div className="landing-stars" aria-label={`${review.rating} out of 5 stars`}>
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <span key={`${review.id}-star-${index}`} className={index < review.rating ? 'filled' : ''}>
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                  <p>{review.quote}</p>
+                  <div>
+                    <strong>{review.author}</strong>
+                    <small>{review.role}</small>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="landing-empty">No approved customer reviews with comments are available yet.</p>
+            )}
           </div>
         </div>
       </section>
 
-      {featuredProducts.length === 0 ? (
-        <section className="notice">
-          No products loaded yet. Add inventory to fill the catalog.
+      <section className="landing-section landing-section-surface" aria-labelledby="insight-title">
+        <div className="landing-container">
+          <div className="landing-insight-layout">
+            <div className="landing-insight-list">
+              {featureInsights.map((insight) => {
+                const isOpen = insight.id === activeInsightId
+
+                return (
+                  <article key={insight.id} className={`landing-insight-item${isOpen ? ' open' : ''}`}>
+                    <button
+                      type="button"
+                      className="landing-insight-toggle"
+                      onClick={() => {
+                        setActiveInsightId((current) => (current === insight.id ? null : insight.id))
+                      }}
+                      aria-expanded={isOpen}
+                    >
+                      <span>{insight.title}</span>
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+
+                    {isOpen ? (
+                      <div className="landing-insight-content">
+                        <h3>{insight.lead}</h3>
+                        <p>{insight.description}</p>
+                      </div>
+                    ) : null}
+                  </article>
+                )
+              })}
+            </div>
+
+            <div className="landing-insight-media-card">
+              {featureShowcaseImage ? (
+                <img
+                  src={featureShowcaseImage}
+                  alt={featureShowcaseProduct?.name || 'XETA featured hardware'}
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <div className="landing-image-fallback" aria-hidden="true" />
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {loadFailed ? (
+        <section className="landing-inline-alert" role="status">
+          Unable to sync live catalog data right now. The landing structure is active and will populate automatically on the next successful API call.
         </section>
       ) : null}
     </div>

@@ -32,10 +32,6 @@ class SupportTicketController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        if ($request->filled('priority')) {
-            $query->where('priority', $request->input('priority'));
-        }
-
         if ($request->filled('type')) {
             $query->where('type', $request->input('type'));
         }

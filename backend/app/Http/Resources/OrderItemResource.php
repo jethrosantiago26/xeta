@@ -20,7 +20,8 @@ class OrderItemResource extends JsonResource
 
         $matchingReview = null;
         if ($product && $product->relationLoaded('reviews')) {
-            $matchingReview = $product->reviews->firstWhere('order_id', $this->order_id)
+            $matchingReview = $product->reviews->firstWhere('variant_id', $this->variant_id)
+                ?? $product->reviews->firstWhere('order_id', $this->order_id)
                 ?? $product->reviews->first();
         }
 

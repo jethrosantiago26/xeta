@@ -19,7 +19,6 @@ class SupportTicketService
             'ticket_number' => SupportTicket::generateTicketNumber(),
             'subject' => $payload['subject'],
             'type' => $payload['type'],
-            'priority' => $payload['priority'],
             'status' => 'open',
             'channel' => 'web',
             'description' => $payload['message'],
@@ -89,10 +88,6 @@ class SupportTicketService
             $ticket->status = $payload['status'];
         }
 
-        if (array_key_exists('priority', $payload) && $payload['priority']) {
-            $ticket->priority = $payload['priority'];
-        }
-
         if (array_key_exists('assigned_admin_id', $payload)) {
             $ticket->assigned_admin_id = $payload['assigned_admin_id'];
         }
@@ -139,10 +134,9 @@ class SupportTicketService
 
         $subject = sprintf('New support message [%s]', $ticket->ticket_number);
         $body = sprintf(
-            "Ticket %s\nSubject: %s\nPriority: %s\nStatus: %s\n\nMessage:\n%s",
+            "Ticket %s\nSubject: %s\nStatus: %s\n\nMessage:\n%s",
             $ticket->ticket_number,
             $ticket->subject,
-            $ticket->priority,
             $ticket->status,
             $message,
         );

@@ -14,7 +14,7 @@ class StoreVariantRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', 'not_regex:/\bused\b/i'],
             'sku' => ['required', 'string', 'max:255', 'unique:product_variants,sku'],
             'price' => ['required', 'numeric', 'min:0'],
             'compare_at_price' => ['nullable', 'numeric', 'min:0'],
@@ -23,6 +23,13 @@ class StoreVariantRequest extends FormRequest
             'attributes' => ['nullable', 'array'],
             'image' => ['nullable', 'image', 'max:5120'],
             'is_active' => ['boolean'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.not_regex' => 'Variant name must not include the word "used".',
         ];
     }
 }

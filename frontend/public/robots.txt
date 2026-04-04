@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Keep non-public customer/admin routes out of search results.
+Disallow: /admin
+Disallow: /account
+Disallow: /orders
+Disallow: /checkout
+Disallow: /cart

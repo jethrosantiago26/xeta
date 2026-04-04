@@ -15,7 +15,6 @@ class UpdateSupportTicketRequest extends FormRequest
     {
         return [
             'status' => ['nullable', 'in:open,in_progress,waiting_customer,resolved,closed'],
-            'priority' => ['nullable', 'in:low,normal,high,urgent'],
             'assigned_admin_id' => ['nullable', 'integer', 'exists:users,id'],
             'resolution_summary' => ['nullable', 'string', 'max:1000'],
         ];

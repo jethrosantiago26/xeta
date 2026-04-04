@@ -49,7 +49,7 @@ function AccountPage() {
   const { profile, refreshProfile } = useSession()
   const isAdmin = profile?.role === 'admin'
   const [activeTab, setActiveTab] = useState('profile')
-  
+
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem(SETTINGS_STORAGE_KEY)
     if (!saved) return defaultSettings
@@ -91,7 +91,6 @@ function AccountPage() {
     latitude: '',
     longitude: '',
     location_source: '',
-    preferred_contact_method: 'email',
   })
 
   useEffect(() => {
@@ -115,7 +114,6 @@ function AccountPage() {
       latitude: profile.latitude ?? '',
       longitude: profile.longitude ?? '',
       location_source: profile.location_source ?? '',
-      preferred_contact_method: profile.preferred_contact_method ?? 'email',
     })
   }, [profile, isAdmin])
 
@@ -289,11 +287,11 @@ function AccountPage() {
             <h1>Your dashboard</h1>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--color-border)', paddingBottom: '0px' }}>
-          <button 
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', borderBottom: '1px solid var(--color-border)', paddingBottom: '0px' }}>
+          <button
             className={`tab-link ${activeTab === 'profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('profile')}
-            style={{ 
+            style={{
               background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
               color: activeTab === 'profile' ? 'var(--color-primary)' : 'var(--color-text-muted)',
               borderBottom: activeTab === 'profile' ? '2px solid var(--color-primary)' : '2px solid transparent',
@@ -302,10 +300,10 @@ function AccountPage() {
           >
             Profile
           </button>
-          <button 
+          <button
             className={`tab-link ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
-            style={{ 
+            style={{
               background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
               color: activeTab === 'settings' ? 'var(--color-primary)' : 'var(--color-text-muted)',
               borderBottom: activeTab === 'settings' ? '2px solid var(--color-primary)' : '2px solid transparent',
@@ -328,10 +326,6 @@ function AccountPage() {
               <div>
                 <p className="caption">Role</p>
                 <strong>{profile?.role ?? 'Customer'}</strong>
-              </div>
-              <div>
-                <p className="caption">Contact</p>
-                <strong>{profile?.preferred_contact_method ?? 'email'}</strong>
               </div>
             </div>
           </div>
@@ -370,145 +364,132 @@ function AccountPage() {
               <div className="section-rule" aria-hidden="true" />
             </div>
 
-          <div className="field-grid account-grid account-grid-vertical" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div className="stack" style={{ gap: '5px' }}>
-              <label className="caption">Preferred Contact Method</label>
-              <select
-                className="select"
-                value={form.preferred_contact_method}
-                onChange={(event) =>
-                  setForm({ ...form, preferred_contact_method: event.target.value })
-                }
-              >
-                <option value="email">E-mail</option>
-                <option value="phone">Phone</option>
-              </select>
-            </div>
-            <div className="account-grid account-grid-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div className="field-grid account-grid account-grid-vertical" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="account-grid account-grid-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div className="stack" style={{ gap: '5px' }}>
+                  <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    First name <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+                  </label>
+                  <input
+                    className="input input-readonly"
+                    readOnly
+                    placeholder="First name"
+                    value={form.first_name}
+                  />
+                </div>
+                <div className="stack" style={{ gap: '5px' }}>
+                  <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    Last name <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+                  </label>
+                  <input
+                    className="input input-readonly"
+                    readOnly
+                    placeholder="Last name"
+                    value={form.last_name}
+                  />
+                </div>
+              </div>
+
               <div className="stack" style={{ gap: '5px' }}>
                 <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  First name <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
+                  Username <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
                 </label>
                 <input
                   className="input input-readonly"
                   readOnly
-                  placeholder="First name"
-                  value={form.first_name}
+                  placeholder="Username"
+                  value={form.username}
                 />
               </div>
+
               <div className="stack" style={{ gap: '5px' }}>
-                <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  Last name <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
-                </label>
-                <input
-                  className="input input-readonly"
-                  readOnly
-                  placeholder="Last name"
-                  value={form.last_name}
-                />
-              </div>
-            </div>
-
-            <div className="stack" style={{ gap: '5px' }}>
-              <label className="caption" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                Username <span className="pill pill-info" style={{ fontSize: '10px', padding: '2px 6px' }}>Synced</span>
-              </label>
-              <input
-                className="input input-readonly"
-                readOnly
-                placeholder="Username"
-                value={form.username}
-              />
-            </div>
-
-            <div className="stack" style={{ gap: '5px' }}>
-              <label className="caption">Phone number</label>
-              <input
-                className="input"
-                placeholder="Phone number"
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-              />
-            </div>
-            {!isAdmin ? (
-              <div className="account-address-autocomplete">
+                <label className="caption">Phone number</label>
                 <input
                   className="input"
-                  placeholder="Full address"
-                  value={form.address_line1}
-                  onFocus={() => {
-                    if (addressSuggestions.length > 0) {
+                  placeholder="Phone number"
+                  value={form.phone}
+                  onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                />
+              </div>
+              {!isAdmin ? (
+                <div className="account-address-autocomplete">
+                  <input
+                    className="input"
+                    placeholder="Full address"
+                    value={form.address_line1}
+                    onFocus={() => {
+                      if (addressSuggestions.length > 0) {
+                        setAddressOpen(true)
+                      }
+                    }}
+                    onChange={(event) => {
+                      setForm({ ...form, address_line1: event.target.value })
                       setAddressOpen(true)
-                    }
-                  }}
-                  onChange={(event) => {
-                    setForm({ ...form, address_line1: event.target.value })
-                    setAddressOpen(true)
-                  }}
-                />
-                {addressSearching ? (
-                  <p className="caption account-address-status">Searching address suggestions...</p>
-                ) : null}
-                {addressOpen && addressSuggestions.length > 0 ? (
-                  <div className="account-address-suggestions" role="listbox" aria-label="Address suggestions">
-                    {addressSuggestions.map((suggestion) => (
-                      <button
-                        key={suggestion.id}
-                        type="button"
-                        className="account-address-option"
-                        onClick={() => handleAddressSuggestionSelect(suggestion)}
-                      >
-                        {suggestion.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+                    }}
+                  />
+                  {addressSearching ? (
+                    <p className="caption account-address-status">Searching address suggestions...</p>
+                  ) : null}
+                  {addressOpen && addressSuggestions.length > 0 ? (
+                    <div className="account-address-suggestions" role="listbox" aria-label="Address suggestions">
+                      {addressSuggestions.map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          className="account-address-option"
+                          onClick={() => handleAddressSuggestionSelect(suggestion)}
+                        >
+                          {suggestion.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
-            {!isAdmin ? (
-              <div className="stack" style={{ gap: '5px' }}>
-                <label className="caption">Address line 2</label>
-                <input
-                  className="input"
-                  placeholder="Floor, suite, apt (optional)"
-                  value={form.address_line2}
-                  onChange={(event) => setForm({ ...form, address_line2: event.target.value })}
-                />
-              </div>
-            ) : null}
-          </div>
-
-          <div className="actions account-actions">
-            {!isAdmin ? (
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={handleLocationLookup}
-                disabled={locationLoading}
-              >
-                {locationLoading ? 'Detecting location...' : 'Detect location'}
-              </button>
-            ) : null}
-            <button type="button" className="button button-primary" onClick={handleSave} disabled={loading}>
-              {loading ? 'Saving profile...' : 'Save profile'}
-            </button>
-          </div>
-
-          {!isAdmin ? (
-            <div className="stack" style={{ gap: '10px' }}>
-              <p className="caption" style={{ margin: 0 }}>
-                Map picker: click any point to fill city, country, and coordinates.
-              </p>
-              <Suspense fallback={<div className="notice">Loading map...</div>}>
-                <LocationPickerMap
-                  latitude={hasMapPosition ? parsedLatitude : undefined}
-                  longitude={hasMapPosition ? parsedLongitude : undefined}
-                  onSelect={handleMapSelect}
-                />
-              </Suspense>
+              {!isAdmin ? (
+                <div className="stack" style={{ gap: '5px' }}>
+                  <label className="caption">Address line 2</label>
+                  <input
+                    className="input"
+                    placeholder="Floor, suite, apt (optional)"
+                    value={form.address_line2}
+                    onChange={(event) => setForm({ ...form, address_line2: event.target.value })}
+                  />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+
+            <div className="actions account-actions">
+              {!isAdmin ? (
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={handleLocationLookup}
+                  disabled={locationLoading}
+                >
+                  {locationLoading ? 'Detecting location...' : 'Detect location'}
+                </button>
+              ) : null}
+              <button type="button" className="button button-primary" onClick={handleSave} disabled={loading}>
+                {loading ? 'Saving profile...' : 'Save profile'}
+              </button>
+            </div>
+
+            {!isAdmin ? (
+              <div className="stack" style={{ gap: '10px' }}>
+                <p className="caption" style={{ margin: 0 }}>
+                  Map picker: click any point to fill city, country, and coordinates.
+                </p>
+                <Suspense fallback={<div className="notice">Loading map...</div>}>
+                  <LocationPickerMap
+                    latitude={hasMapPosition ? parsedLatitude : undefined}
+                    longitude={hasMapPosition ? parsedLongitude : undefined}
+                    onSelect={handleMapSelect}
+                  />
+                </Suspense>
+              </div>
+            ) : null}
 
             {message ? <div className="notice">{message}</div> : null}
             {error ? <div className="notice error">{error}</div> : null}
@@ -562,21 +543,6 @@ function AccountPage() {
                 </label>
               </div>
             </article>
-
-            <article className="content-card settings-card">
-              <h3>Privacy</h3>
-              <p className="muted">Control how your account appears in shared experiences.</p>
-              <select
-                className="select"
-                value={settings.profile_visibility}
-                onChange={(event) => setSettings({ ...settings, profile_visibility: event.target.value })}
-              >
-                <option value="private">Profile visibility: private</option>
-                <option value="friends">Profile visibility: friends</option>
-                <option value="public">Profile visibility: public</option>
-              </select>
-            </article>
-
             <section className="content-card settings-actions">
               <button type="button" className="button button-primary" onClick={handleSaveSettings}>
                 Save settings

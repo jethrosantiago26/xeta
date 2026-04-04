@@ -10,14 +10,11 @@ import {
 } from '../lib/api.js'
 import { 
   Send, 
-  Image as ImageIcon, 
   Search, 
   MessageCircle, 
   ShieldCheck, 
   User, 
   Clock, 
-  AlertCircle,
-  CheckCircle2,
   Paperclip,
   ChevronRight
 } from 'lucide-react'
@@ -26,7 +23,7 @@ const REFRESH_INTERVAL_MS = 10000
 
 const STATUS_TABS = [
   { key: 'active', label: 'Active' },
-  { key: 'urgent', label: 'Urgent' },
+  { key: 'waiting', label: 'Waiting' },
   { key: 'resolved', label: 'Resolved' },
 ]
 
@@ -36,20 +33,11 @@ const statusOptions = [
   { value: 'resolved', label: 'Resolved' },
 ]
 
-const priorityOptions = [
-  { value: 'low', label: 'Low' },
-  { value: 'normal', label: 'Normal' },
-  { value: 'high', label: 'High' },
-  { value: 'urgent', label: 'Urgent' },
-]
-
 function AdminSupportPage() {
   const [tickets, setTickets] = useState([])
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [loadingList, setLoadingList] = useState(true)
-  const [loadingTicket, setLoadingTicket] = useState(false)
   const [status, setStatus] = useState('open')
-  const [priority, setPriority] = useState('normal')
   const [resolutionSummary, setResolutionSummary] = useState('')
   const [reply, setReply] = useState('')
   const [error, setError] = useState('')
@@ -67,7 +55,7 @@ function AdminSupportPage() {
 
   useEffect(() => {
     if (selectedTicket) scrollToBottom()
-  }, [selectedTicket?.messages])
+  }, [selectedTicket])
 
   const filteredTickets = useMemo(() => {
     let results = [...tickets].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -75,8 +63,8 @@ function AdminSupportPage() {
     // Tab filter
     if (activeTab === 'active') {
       results = results.filter(t => t.status !== 'resolved' && t.status !== 'closed')
-    } else if (activeTab === 'urgent') {
-      results = results.filter(t => t.priority === 'urgent' && t.status !== 'resolved')
+    } else if (activeTab === 'waiting') {
+      results = results.filter(t => t.status === 'waiting_customer')
     } else if (activeTab === 'resolved') {
       results = results.filter(t => t.status === 'resolved' || t.status === 'closed')
     }
@@ -96,7 +84,7 @@ function AdminSupportPage() {
 
   const tabCounts = useMemo(() => ({
     active: tickets.filter(t => t.status !== 'resolved' && t.status !== 'closed').length,
-    urgent: tickets.filter(t => t.priority === 'urgent' && t.status !== 'resolved').length,
+    waiting: tickets.filter(t => t.status === 'waiting_customer').length,
     resolved: tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length,
   }), [tickets])
 
@@ -122,7 +110,6 @@ function AdminSupportPage() {
   }, [])
 
   async function loadTicket(ticketId) {
-    setLoadingTicket(true)
     try {
       const response = await getAdminSupportTicket(ticketId)
       const raw = readResource(response)
@@ -131,13 +118,10 @@ function AdminSupportPage() {
       if (!ticket?.id) throw new Error('Empty ticket response')
       setSelectedTicket(ticket)
       setStatus(ticket.status)
-      setPriority(ticket.priority)
       setResolutionSummary(ticket.resolution_summary || '')
     } catch (err) {
       setError('Failed to load ticket details.')
       console.error('[loadTicket]', err)
-    } finally {
-      setLoadingTicket(false)
     }
   }
 
@@ -147,7 +131,6 @@ function AdminSupportPage() {
     try {
       const response = await updateAdminSupportTicket(selectedTicket.id, {
         status,
-        priority,
         resolution_summary: resolutionSummary.trim() || null,
       })
       const raw = readResource(response)
@@ -192,6 +175,11 @@ function AdminSupportPage() {
           title="Support Inbox"
           description="Unified desk for customer inquiries and issue resolution."
         />
+        {error ? (
+          <div className="notice error" style={{ marginTop: '12px' }}>
+            {error}
+          </div>
+        ) : null}
       </div>
 
       <div style={{ display: 'flex', gap: '20px', flex: 1, minHeight: 0, padding: '0 32px 24px' }}>
@@ -228,7 +216,6 @@ function AdminSupportPage() {
             {loadingList ? <div className="notice">Loading...</div> : null}
             {filteredTickets.map(ticket => {
               const isSelected = selectedTicket?.id === ticket.id
-              const isUrgent = ticket.priority === 'urgent'
               return (
                 <div
                   key={ticket.id}
@@ -238,7 +225,7 @@ function AdminSupportPage() {
                     cursor: 'pointer',
                     borderBottom: '1px solid var(--color-border)',
                     background: isSelected ? 'var(--color-surface-3)' : 'transparent',
-                    borderLeft: isUrgent ? '3px solid var(--color-error)' : '3px solid transparent',
+                    borderLeft: ticket.status === 'waiting_customer' ? '3px solid var(--color-notice-border)' : '3px solid transparent',
                     transition: 'background 0.2s'
                   }}
                 >
@@ -251,9 +238,8 @@ function AdminSupportPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span className={`status-pill ${ticket.status === 'open' ? 'warning' : 'success'}`} style={{ fontSize: '10px', height: '18px' }}>
-                      {ticket.status}
+                      {ticket.status?.replace(/_/g, ' ')}
                     </span>
-                    {isUrgent && <AlertCircle size={12} color="var(--color-error)" />}
                   </div>
                 </div>
               )
@@ -281,7 +267,9 @@ function AdminSupportPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <span className={`status-pill status-${selectedTicket.priority}`} style={{ textTransform: 'capitalize' }}>{selectedTicket.priority} Priority</span>
+                  <span className={`status-pill ${selectedTicket.status === 'open' ? 'warning' : selectedTicket.status === 'resolved' || selectedTicket.status === 'closed' ? 'success' : ''}`} style={{ textTransform: 'capitalize' }}>
+                    {selectedTicket.status?.replace(/_/g, ' ')}
+                  </span>
                 </div>
               </header>
 
@@ -316,16 +304,10 @@ function AdminSupportPage() {
               {/* Triage & Reply Section */}
               <footer style={{ padding: '20px 24px', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface-1)' }}>
                 <form onSubmit={handleUpdate} style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'flex-end', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, maxWidth: '280px' }}>
                     <label className="form-label" style={{ fontSize: '11px' }}>Update Status</label>
                     <select className="select" style={{ height: '32px', fontSize: '12px' }} value={status} onChange={e => setStatus(e.target.value)}>
                       {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label className="form-label" style={{ fontSize: '11px' }}>Priority</label>
-                    <select className="select" style={{ height: '32px', fontSize: '12px' }} value={priority} onChange={e => setPriority(e.target.value)}>
-                      {priorityOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
                   <button className="button button-secondary" type="submit" style={{ height: '32px', padding: '0 16px', fontSize: '12px' }} disabled={saving}>

@@ -126,7 +126,7 @@ function CheckoutPage() {
           <h3>Order total</h3>
           <div className="divider" />
           <p className="price">{formatMoney(totals.total)}</p>
-          <p className="muted">Taxes and shipping are calculated by the server.</p>
+          <p className="muted">Shipping is calculated by the server.</p>
           <p className="caption">Items in cart: {items.length}</p>
         </div>
         <div className="summary-card">

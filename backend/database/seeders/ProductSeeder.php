@@ -41,7 +41,7 @@ class ProductSeeder extends Seeder
             [
                 'product_id' => $deskMat->id,
                 'name' => 'Desk Mat — Black',
-                'price' => 24.99,
+                'price' => 1250,
                 'stock_quantity' => 120,
                 'condition' => 'new',
                 'attributes' => ['color' => 'Black'],
@@ -82,7 +82,7 @@ class ProductSeeder extends Seeder
             [
                 'product_id' => $wristRest->id,
                 'name' => 'Wrist Rest — Graphite',
-                'price' => 18.99,
+                'price' => 950,
                 'stock_quantity' => 90,
                 'condition' => 'new',
                 'attributes' => ['color' => 'Graphite'],
@@ -123,7 +123,7 @@ class ProductSeeder extends Seeder
             [
                 'product_id' => $coiledCable->id,
                 'name' => 'Coiled Cable — Ivory',
-                'price' => 29.99,
+                'price' => 1500,
                 'stock_quantity' => 75,
                 'condition' => 'new',
                 'attributes' => ['color' => 'Ivory'],

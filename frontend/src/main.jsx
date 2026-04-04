@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { Fragment, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { BrowserRouter } from 'react-router-dom'
@@ -8,9 +8,10 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const RootBoundary = import.meta.env.MODE === 'lighthouse' ? Fragment : StrictMode
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+  <RootBoundary>
     <ThemeProvider>
       <AppErrorBoundary>
         {clerkPublishableKey ? (
@@ -26,5 +27,5 @@ createRoot(document.getElementById('root')).render(
         )}
       </AppErrorBoundary>
     </ThemeProvider>
-  </StrictMode>,
+  </RootBoundary>,
 )

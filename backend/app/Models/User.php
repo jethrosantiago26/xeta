@@ -35,7 +35,6 @@ class User extends Authenticatable
         'latitude',
         'longitude',
         'location_source',
-        'preferred_contact_method',
         'location_updated_at',
         'role',
     ];

@@ -155,6 +155,8 @@ class ProductController extends Controller
         $payload['attributes'] = $this->variantVisualService->buildAttributes($productModel, $payload);
 
         $variant = $productModel->variants()->create($payload);
+        $this->syncProductVariantPrices($productModel, (float) $variant->price);
+        $variant->refresh();
 
         return response()->json([
             'message' => 'Variant created',
@@ -168,7 +170,7 @@ class ProductController extends Controller
     public function updateVariant(Request $request, int $product, int $variant): JsonResponse
     {
         $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => ['sometimes', 'string', 'max:255', 'not_regex:/\bused\b/i'],
             'sku' => ['sometimes', 'string', 'max:255', 'unique:product_variants,sku,' . $variant],
             'price' => ['sometimes', 'numeric', 'min:0'],
             'compare_at_price' => ['nullable', 'numeric', 'min:0'],
@@ -198,6 +200,13 @@ class ProductController extends Controller
 
         $variantModel->update($validated);
 
+        $targetPrice = array_key_exists('price', $validated)
+            ? (float) $validated['price']
+            : (float) $variantModel->price;
+
+        $this->syncProductVariantPrices($productModel, $targetPrice);
+        $variantModel->refresh();
+
         return response()->json([
             'message' => 'Variant updated',
             'variant' => new ProductVariantResource($variantModel),
@@ -226,5 +235,12 @@ class ProductController extends Controller
         $image->move($destination, $filename);
 
         return '/uploads/variants/' . $filename;
+    }
+
+    private function syncProductVariantPrices(Product $productModel, float $price): void
+    {
+        $normalizedPrice = round($price, 2);
+
+        $productModel->variants()->update(['price' => $normalizedPrice]);
     }
 }

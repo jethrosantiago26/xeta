@@ -139,10 +139,6 @@ function CartPage() {
                   <span>Shipping</span>
                   <span>{totals.shipping === 0 ? 'Free' : formatMoney(totals.shipping)}</span>
                 </div>
-                <div className="cart-summary-row">
-                  <span>Tax</span>
-                  <span>{formatMoney(totals.tax)}</span>
-                </div>
                 <div className="cart-summary-divider" />
                 <div className="cart-summary-row cart-summary-total">
                   <span>Total</span>

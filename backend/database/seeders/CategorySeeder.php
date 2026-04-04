@@ -61,7 +61,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $f1v2->id,
             'name' => 'F1 V2 — White',
-            'price' => 89.99,
+            'price' => 4500,
             'stock_quantity' => 50,
             'condition' => 'new',
             'attributes' => ['color' => 'White'],
@@ -72,7 +72,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $f1v2->id,
             'name' => 'F1 V2 — Black',
-            'price' => 89.99,
+            'price' => 4500,
             'stock_quantity' => 45,
             'condition' => 'new',
             'attributes' => ['color' => 'Black'],
@@ -83,8 +83,8 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $f1v2->id,
             'name' => 'F1 V2 — Black (Used)',
-            'price' => 59.99,
-            'compare_at_price' => 89.99,
+            'price' => 3000,
+            'compare_at_price' => 4500,
             'stock_quantity' => 5,
             'condition' => 'used',
             'attributes' => ['color' => 'Black', 'grade' => 'A — Like New'],
@@ -124,7 +124,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $x1v2->id,
             'name' => 'X1 V2 — Phantom',
-            'price' => 79.99,
+            'price' => 4000,
             'stock_quantity' => 60,
             'condition' => 'new',
             'attributes' => ['color' => 'Phantom Gray'],
@@ -135,7 +135,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $x1v2->id,
             'name' => 'X1 V2 — Arctic',
-            'price' => 79.99,
+            'price' => 4000,
             'stock_quantity' => 40,
             'condition' => 'new',
             'attributes' => ['color' => 'Arctic White'],
@@ -176,7 +176,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $k1->id,
             'name' => 'K1 Pro — Carbon',
-            'price' => 149.99,
+            'price' => 7500,
             'stock_quantity' => 30,
             'condition' => 'new',
             'attributes' => ['color' => 'Carbon Black'],
@@ -187,7 +187,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $k1->id,
             'name' => 'K1 Pro — Ivory',
-            'price' => 149.99,
+            'price' => 7500,
             'stock_quantity' => 25,
             'condition' => 'new',
             'attributes' => ['color' => 'Ivory White'],
@@ -198,8 +198,8 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $k1->id,
             'name' => 'K1 Pro — Carbon (Used)',
-            'price' => 109.99,
-            'compare_at_price' => 149.99,
+            'price' => 5500,
+            'compare_at_price' => 7500,
             'stock_quantity' => 3,
             'condition' => 'used',
             'attributes' => ['color' => 'Carbon Black', 'grade' => 'B — Good condition'],
@@ -240,7 +240,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $k1mini->id,
             'name' => 'K1 Mini — Onyx',
-            'price' => 119.99,
+            'price' => 6000,
             'stock_quantity' => 35,
             'condition' => 'new',
             'attributes' => ['color' => 'Onyx'],
@@ -278,7 +278,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $p1->id,
             'name' => 'P1 Control — Medium',
-            'price' => 24.99,
+            'price' => 1250,
             'stock_quantity' => 100,
             'condition' => 'new',
             'attributes' => ['size' => 'M (360x300mm)'],
@@ -289,7 +289,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $p1->id,
             'name' => 'P1 Control — Large',
-            'price' => 34.99,
+            'price' => 1750,
             'stock_quantity' => 80,
             'condition' => 'new',
             'attributes' => ['size' => 'L (490x420mm)'],
@@ -300,7 +300,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $p1->id,
             'name' => 'P1 Control — XL Desk Mat',
-            'price' => 44.99,
+            'price' => 2250,
             'stock_quantity' => 60,
             'condition' => 'new',
             'attributes' => ['size' => 'XL (900x400mm)'],
@@ -338,7 +338,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $p1speed->id,
             'name' => 'P1 Speed — Large',
-            'price' => 49.99,
+            'price' => 2500,
             'stock_quantity' => 40,
             'condition' => 'new',
             'attributes' => ['size' => 'L (490x420mm)'],
@@ -349,7 +349,7 @@ class CategorySeeder extends Seeder
         ], [
             'product_id' => $p1speed->id,
             'name' => 'P1 Speed — XL',
-            'price' => 64.99,
+            'price' => 3250,
             'stock_quantity' => 30,
             'condition' => 'new',
             'attributes' => ['size' => 'XL (900x400mm)'],

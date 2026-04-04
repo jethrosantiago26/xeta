@@ -17,13 +17,13 @@ function normalizeCart(payload) {
 }
 
 export function CartProvider({ children }) {
-  const { profile, isLoaded } = useSession()
+  const { profile, isLoaded, isSignedIn, loading: sessionLoading } = useSession()
   const [items, setItems] = useState([])
   const [totals, setTotals] = useState({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
   const [loading, setLoading] = useState(false)
 
   const refreshCart = useCallback(async ({ background = false } = {}) => {
-    if (!profile) {
+    if (!isSignedIn || !profile || profile.role === 'admin') {
       setItems([])
       setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
       return
@@ -38,7 +38,7 @@ export function CartProvider({ children }) {
       const cart = normalizeCart(response.data)
       setItems(cart.items)
       setTotals(cart.totals)
-    } catch (error) {
+    } catch {
       if (!background) {
         setItems([])
         setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
@@ -48,18 +48,18 @@ export function CartProvider({ children }) {
         setLoading(false)
       }
     }
-  }, [profile])
+  }, [isSignedIn, profile])
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!isLoaded || sessionLoading) {
       return
     }
 
     refreshCart()
-  }, [isLoaded, refreshCart])
+  }, [isLoaded, sessionLoading, refreshCart])
 
   useEffect(() => {
-    if (!isLoaded || !profile) {
+    if (!isLoaded || sessionLoading || !isSignedIn || !profile || profile.role === 'admin') {
       return
     }
 
@@ -78,7 +78,7 @@ export function CartProvider({ children }) {
       window.clearInterval(intervalId)
       window.removeEventListener('focus', refreshVisibleCart)
     }
-  }, [isLoaded, profile, refreshCart])
+  }, [isLoaded, sessionLoading, isSignedIn, profile, refreshCart])
 
   const value = {
     items,

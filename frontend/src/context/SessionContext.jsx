@@ -87,7 +87,7 @@ async function tryAutoSetupLocation(profile) {
     const refreshed = await getMe()
     localStorage.setItem(markerKey, 'done')
     return normalizeUser(refreshed.data)
-  } catch (error) {
+  } catch {
     localStorage.setItem(markerKey, 'blocked')
     return profile
   }
@@ -132,7 +132,6 @@ export function SessionProvider({ children }) {
       const cachedProfile = readCachedProfile(userId)
       if (cachedProfile) {
         setProfile(cachedProfile)
-        setLoading(false)
       } else {
         setLoading(true)
       }
@@ -142,15 +141,24 @@ export function SessionProvider({ children }) {
         const token = await getToken()
         setApiAuthToken(token)
 
+        let response = null
+
         try {
-          console.debug('[SessionContext] Syncing user with backend...')
-          await syncAuth()
-        } catch (syncError) {
-          console.warn('[SessionContext] Sync failed, falling back to profile fetch.', syncError)
+          console.debug('[SessionContext] Fetching user profile...')
+          response = await getMe()
+        } catch {
+          // First-time accounts may not exist yet in the backend; sync and retry.
+          console.debug('[SessionContext] Profile fetch failed. Syncing and retrying...')
+
+          try {
+            await syncAuth()
+          } catch {
+            // Continue to retry getMe so the original profile error path is preserved.
+          }
+
+          response = await getMe()
         }
 
-        console.debug('[SessionContext] Fetching user profile...')
-        const response = await getMe()
         const currentUser = normalizeUser(response.data)
 
         console.log('[SessionContext] Profile loaded:', {
@@ -178,7 +186,7 @@ export function SessionProvider({ children }) {
           .catch(() => {
             // Ignore background location setup errors.
           })
-      } catch (error) {
+      } catch {
         if (active) {
           setProfile(null)
         }

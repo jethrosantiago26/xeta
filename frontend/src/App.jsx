@@ -5,6 +5,7 @@ import AppLayout from './components/layout/AppLayout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { CartProvider } from './context/CartContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'
+import { WishlistProvider } from './context/WishlistContext.jsx'
 import { useSession } from './context/SessionContext.jsx'
 import SetupPage from './pages/SetupPage.jsx'
 import { setApiAuthToken, setApiAuthTokenProvider } from './lib/api.js'
@@ -28,6 +29,7 @@ const OrdersPage = lazy(() => import('./pages/OrdersPage.jsx'))
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage.jsx'))
 const ProductsPage = lazy(() => import('./pages/ProductsPage.jsx'))
 const SupportPage = lazy(() => import('./pages/SupportPage.jsx'))
+const WishlistPage = lazy(() => import('./pages/WishlistPage.jsx'))
 
 function RouteLoadingFallback() {
   return (
@@ -158,153 +160,163 @@ function App({ clerkReady }) {
   return (
     <SessionProvider>
       <CartProvider>
-        <AuthBridge />
-        <Suspense fallback={<RouteLoadingFallback />}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route
-                index
-                element={
-                  <AdminShoppingRedirect>
-                    <HomePage />
-                  </AdminShoppingRedirect>
-                }
-              />
-              <Route
-                path="products"
-                element={
-                  <AdminShoppingRedirect>
-                    <ProductsPage />
-                  </AdminShoppingRedirect>
-                }
-              />
-              <Route
-                path="products/:slug"
-                element={
-                  <AdminShoppingRedirect>
-                    <ProductDetailPage />
-                  </AdminShoppingRedirect>
-                }
-              />
-              <Route
-                path="cart"
-                element={
-                  <ProtectedRoute disallowAdmin>
-                    <CartPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="checkout"
-                element={
-                  <ProtectedRoute disallowAdmin>
-                    <CheckoutPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="orders"
-                element={
-                  <ProtectedRoute disallowAdmin>
-                    <OrdersPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="support"
-                element={
-                  <ProtectedRoute disallowAdmin>
-                    <SupportPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="faq"
-                element={
-                  <ProtectedRoute disallowAdmin>
-                    <FaqPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="account"
-                element={
-                  <ProtectedRoute>
-                    <AccountPage />
-                  </ProtectedRoute>
-                }
-              />
+        <WishlistProvider>
+          <AuthBridge />
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route
+                  index
+                  element={
+                    <AdminShoppingRedirect>
+                      <HomePage />
+                    </AdminShoppingRedirect>
+                  }
+                />
+                <Route
+                  path="products"
+                  element={
+                    <AdminShoppingRedirect>
+                      <ProductsPage />
+                    </AdminShoppingRedirect>
+                  }
+                />
+                <Route
+                  path="products/:slug"
+                  element={
+                    <AdminShoppingRedirect>
+                      <ProductDetailPage />
+                    </AdminShoppingRedirect>
+                  }
+                />
+                <Route
+                  path="wishlist"
+                  element={
+                    <ProtectedRoute disallowAdmin>
+                      <WishlistPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="cart"
+                  element={
+                    <ProtectedRoute disallowAdmin>
+                      <CartPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="checkout"
+                  element={
+                    <ProtectedRoute disallowAdmin>
+                      <CheckoutPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="orders"
+                  element={
+                    <ProtectedRoute disallowAdmin>
+                      <OrdersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="support"
+                  element={
+                    <ProtectedRoute disallowAdmin>
+                      <SupportPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="faq"
+                  element={
+                    <ProtectedRoute disallowAdmin>
+                      <FaqPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="account"
+                  element={
+                    <ProtectedRoute>
+                      <AccountPage />
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route
-                path="admin"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminAnalyticsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/products"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminProductsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/reviews"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminReviewsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/support"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminSupportPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/orders"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminOrdersPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/customers"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminCustomersPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/inventory"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminInventoryPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="admin/analytics"
-                element={
-                  <ProtectedRoute requireAdmin>
-                    <AdminAnalyticsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="sign-in" element={<SignInLanding />} />
-              <Route path="post-auth" element={<PostAuthRedirect />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Route>
-          </Routes>
-        </Suspense>
+                <Route
+                  path="admin"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminAnalyticsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/products"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminProductsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/reviews"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminReviewsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/support"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminSupportPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/orders"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminOrdersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/customers"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminCustomersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/inventory"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminInventoryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/analytics"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminAnalyticsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="sign-in" element={<SignInLanding />} />
+                <Route path="post-auth" element={<PostAuthRedirect />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </WishlistProvider>
       </CartProvider>
     </SessionProvider>
   )

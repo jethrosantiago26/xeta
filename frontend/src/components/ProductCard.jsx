@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
+import { useWishlist } from '../context/WishlistContext.jsx'
 import { getAssetUrl } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
 import { getVariantVisual } from '../lib/variantVisuals.js'
@@ -16,6 +17,7 @@ function ProductCard({
 }) {
   const navigate = useNavigate()
   const { addItem } = useCart()
+  const { isWishlisted, toggleItem } = useWishlist()
 
   const visualVariants = useMemo(() => {
     const sortedVariants = [...(product.variants ?? [])].sort((left, right) => Number(left.price) - Number(right.price))
@@ -36,6 +38,9 @@ function ProductCard({
   const [showActionSheet, setShowActionSheet] = useState(false)
   const [sheetAction, setSheetAction] = useState('cart')
   const [actionQuantity, setActionQuantity] = useState(1)
+  const [showQuickView, setShowQuickView] = useState(false)
+  const [quickViewQuantity, setQuickViewQuantity] = useState(1)
+  const [quickViewBusy, setQuickViewBusy] = useState(false)
 
   const selectedVariant = useMemo(() => {
     return visualVariants.find((variant) => String(variant.id) === selectedVariantId)
@@ -88,6 +93,26 @@ function ProductCard({
       ? `from ${formatMoney(price)}`
       : 'See options'
   const feedbackMessage = actionError || actionMessage
+  const inWishlist = isWishlisted(product)
+  const wishlistLabel = inWishlist ? 'Remove from wishlist' : 'Save to wishlist'
+
+  useEffect(() => {
+    if (!showQuickView) {
+      return
+    }
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setShowQuickView(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showQuickView])
 
   function handleOpenQuantitySheet(nextAction) {
     if (!selectedVariant || selectedVariant.stock_quantity <= 0) {
@@ -134,6 +159,66 @@ function ProductCard({
     } finally {
       setBusyAction('')
     }
+  }
+
+  function handleToggleWishlist(event) {
+    event.stopPropagation()
+
+    const result = toggleItem(product)
+
+    if (!result.ok) {
+      setActionMessage('')
+      setActionError('Sign in first to save products to your wishlist.')
+      return
+    }
+
+    setActionError('')
+    setActionMessage(result.saved ? 'Saved to wishlist.' : 'Removed from wishlist.')
+  }
+
+  function handleOpenQuickView(event) {
+    event.stopPropagation()
+    setActionMessage('')
+    setActionError('')
+    setQuickViewQuantity(1)
+    setShowQuickView(true)
+  }
+
+  function closeQuickView() {
+    if (quickViewBusy) {
+      return
+    }
+
+    setShowQuickView(false)
+  }
+
+  async function handleQuickViewAddToCart() {
+    if (!selectedVariant || selectedVariant.stock_quantity <= 0) {
+      setActionMessage('')
+      setActionError('This variant is currently unavailable.')
+      return
+    }
+
+    const safeQuantity = Math.max(1, Math.min(quickViewQuantity, selectedVariant.stock_quantity))
+
+    setQuickViewBusy(true)
+    setActionMessage('')
+    setActionError('')
+
+    try {
+      await addItem(selectedVariant.id, safeQuantity)
+      setActionMessage(`Added ${safeQuantity} item${safeQuantity > 1 ? 's' : ''} to cart.`)
+      setShowQuickView(false)
+    } catch {
+      setActionError('Sign in first to add this item to your cart.')
+    } finally {
+      setQuickViewBusy(false)
+    }
+  }
+
+  function handleQuickViewOpenProduct() {
+    setShowQuickView(false)
+    navigate(productPath)
   }
 
   function isInteractiveCardTarget(target) {
@@ -241,6 +326,148 @@ function ProductCard({
         document.body,
       )
 
+  const quickViewModal = showQuickView ? createPortal(
+        <div
+          className="quick-view-backdrop open"
+          onClick={closeQuickView}
+        >
+          <div
+            className="quick-view-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Quick view: ${product.name}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="quick-view-close"
+              aria-label="Close quick view"
+              onClick={closeQuickView}
+              disabled={quickViewBusy}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 6 18 18M18 6 6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <div className="quick-view-media">
+              <img src={image} alt={product.name} loading="lazy" decoding="async" />
+            </div>
+
+            <div className="quick-view-content">
+              <p className="quick-view-kicker">{product.category?.name ?? 'Peripherals'}</p>
+              <h3 className="quick-view-title">{product.name}</h3>
+              <p className="quick-view-price">{priceLabel}</p>
+
+              {hasMultipleVariants ? (
+                <div className="quick-view-block">
+                  <p className="quick-view-label">Color</p>
+                  <div className="quick-view-color-options" role="radiogroup" aria-label={`Choose ${product.name} color`}>
+                    {visualVariants.map((variant) => {
+                      const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+
+                      return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={isActive}
+                          aria-label={variant.name}
+                          title={variant.name}
+                          className={`quick-view-color-dot${isActive ? ' active' : ''}`}
+                          style={{
+                            '--variant-color': variant.visual.color,
+                            '--variant-ring': variant.visual.ringColor,
+                            '--variant-ink': variant.visual.textColor,
+                          }}
+                          onClick={() => setSelectedVariantId(String(variant.id))}
+                          disabled={quickViewBusy}
+                        />
+                      )
+                    })}
+                  </div>
+                  {selectedVariant ? <p className="quick-view-selected-color">{selectedVariant.name}</p> : null}
+                </div>
+              ) : null}
+
+              {selectedVariant ? (
+                <p className={`quick-view-stock${selectedVariant.stock_quantity > 0 ? '' : ' out'}`}>
+                  {selectedVariant.stock_quantity > 0
+                    ? `In stock (${selectedVariant.stock_quantity} available)`
+                    : 'Currently out of stock'}
+                </p>
+              ) : null}
+
+              <div className="quick-view-qty-row">
+                <span>Quantity</span>
+                <div className="quick-view-stepper">
+                  <button
+                    type="button"
+                    onClick={() => setQuickViewQuantity((quantity) => Math.max(1, quantity - 1))}
+                    disabled={quickViewBusy || quickViewQuantity <= 1}
+                    aria-label="Decrease quantity"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                  <span>{quickViewQuantity}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuickViewQuantity((quantity) => Math.min(selectedVariant?.stock_quantity || 1, quantity + 1))}
+                    disabled={quickViewBusy || quickViewQuantity >= (selectedVariant?.stock_quantity || 1)}
+                    aria-label="Increase quantity"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <p className="quick-view-subtotal">
+                Subtotal: <strong>{formatMoney(price * Math.max(1, quickViewQuantity))}</strong>
+              </p>
+
+              <div className="quick-view-actions">
+                <button
+                  type="button"
+                  className="button button-primary quick-view-add-button"
+                  disabled={quickViewBusy || isSoldOut}
+                  onClick={handleQuickViewAddToCart}
+                >
+                  {quickViewBusy ? 'Adding to cart...' : 'Add to cart'}
+                </button>
+
+                <button
+                  type="button"
+                  className={`quick-view-wishlist-button${inWishlist ? ' active' : ''}`}
+                  onClick={handleToggleWishlist}
+                  aria-label={wishlistLabel}
+                  title={wishlistLabel}
+                  disabled={quickViewBusy}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
+
+              <button type="button" className="button button-secondary quick-view-open-product" onClick={handleQuickViewOpenProduct}>
+                Open full product page
+              </button>
+
+              {feedbackMessage ? (
+                <p className={`quick-view-feedback${actionError ? ' error' : actionMessage ? ' success' : ''}`} role="status" aria-live="polite">
+                  {feedbackMessage}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null
+
   if (isRowLayout) {
     return (
       <>
@@ -260,6 +487,35 @@ function ProductCard({
               fetchPriority={imageFetchPriority}
               decoding="async"
             />
+
+            <div className="product-card-hover-actions" aria-label="Quick product actions">
+              <button
+                type="button"
+                className={`product-card-hover-icon${inWishlist ? ' active' : ''}`}
+                aria-label={wishlistLabel}
+                title={wishlistLabel}
+                onClick={handleToggleWishlist}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="sr-only">{wishlistLabel}</span>
+              </button>
+
+              <button
+                type="button"
+                className="product-card-hover-icon"
+                aria-label="Quick view"
+                title="Quick view"
+                onClick={handleOpenQuickView}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M1.5 12s3.7-6 10.5-6 10.5 6 10.5 6-3.7 6-10.5 6S1.5 12 1.5 12Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                </svg>
+                <span className="sr-only">Quick view</span>
+              </button>
+            </div>
           </div>
 
           <div className="product-card-row-content">
@@ -342,6 +598,7 @@ function ProductCard({
         </article>
 
         {actionSheet}
+        {quickViewModal}
       </>
     )
   }
@@ -364,6 +621,35 @@ function ProductCard({
             fetchPriority={imageFetchPriority}
             decoding="async"
           />
+
+          <div className="product-card-hover-actions" aria-label="Quick product actions">
+            <button
+              type="button"
+              className={`product-card-hover-icon${inWishlist ? ' active' : ''}`}
+              aria-label={wishlistLabel}
+              title={wishlistLabel}
+              onClick={handleToggleWishlist}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="sr-only">{wishlistLabel}</span>
+            </button>
+
+            <button
+              type="button"
+              className="product-card-hover-icon"
+              aria-label="Quick view"
+              title="Quick view"
+              onClick={handleOpenQuickView}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M1.5 12s3.7-6 10.5-6 10.5 6 10.5 6-3.7 6-10.5 6S1.5 12 1.5 12Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
+              </svg>
+              <span className="sr-only">Quick view</span>
+            </button>
+          </div>
         </div>
         <div className="stack product-card-body" style={{ marginTop: '14px', gap: '8px' }}>
           <div className="row product-card-head-row" style={{ justifyContent: uniformCardDesign ? 'flex-start' : 'space-between' }}>
@@ -463,6 +749,7 @@ function ProductCard({
       </article>
 
       {actionSheet}
+      {quickViewModal}
     </>
   )
 }

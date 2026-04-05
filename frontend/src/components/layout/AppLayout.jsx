@@ -28,6 +28,7 @@ const adminSystemMenu = [
 
 const customerBreadcrumbLabels = {
   products: 'Products',
+  wishlist: 'Wishlist',
   cart: 'Cart',
   checkout: 'Checkout',
   orders: 'Orders',
@@ -114,7 +115,8 @@ function AppLayout() {
         <header className="site-header">
           <div className="header-row customer-header-row">
             <NavLink className="brand" to="/">
-              <strong>XETA</strong>
+              <img className="brand-logo" src="/images/xeta-logo.svg" alt="" aria-hidden="true" />
+              <span className="sr-only">XETA</span>
             </NavLink>
           </div>
         </header>
@@ -139,7 +141,8 @@ function AdminLayout({ isDark, toggleTheme }) {
       <header className="site-header">
         <div className="header-row">
           <NavLink className="brand" to="/admin">
-            <strong>XETA</strong>
+            <img className="brand-logo" src="/images/xeta-logo.svg" alt="" aria-hidden="true" />
+            <span className="sr-only">XETA</span>
           </NavLink>
 
           <div className="actions" style={{ gap: '8px' }}>
@@ -235,9 +238,6 @@ function CustomerLayout({ isDark, toggleTheme }) {
   const [supportMenuOpen, setSupportMenuOpen] = useState(false)
   const [supportMenuPinned, setSupportMenuPinned] = useState(false)
   const supportMenuRef = useRef(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsPinned, setSettingsPinned] = useState(false)
-  const settingsMenuRef = useRef(null)
 
   const supportMenuActive = location.pathname === '/support' || location.pathname === '/faq'
   const isLandingPage = location.pathname === '/'
@@ -247,11 +247,6 @@ function CustomerLayout({ isDark, toggleTheme }) {
       if (supportMenuRef.current && !supportMenuRef.current.contains(event.target)) {
         setSupportMenuOpen(false)
         setSupportMenuPinned(false)
-      }
-
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target)) {
-        setSettingsOpen(false)
-        setSettingsPinned(false)
       }
     }
 
@@ -267,16 +262,13 @@ function CustomerLayout({ isDark, toggleTheme }) {
     setSupportMenuPinned(false)
   }
 
-  function closeSettingsMenu() {
-    setSettingsOpen(false)
-    setSettingsPinned(false)
-  }
   return (
     <div className="page-shell">
       <header className={`site-header site-header-landing${isLandingPage ? ' site-header-home' : ''}`}>
         <div className="header-row customer-header-row">
           <NavLink className="brand" to="/">
-            <strong>XETA</strong>
+            <img className="brand-logo" src="/images/xeta-logo.svg" alt="" aria-hidden="true" />
+            <span className="sr-only">XETA</span>
           </NavLink>
 
           <nav className="nav-links">
@@ -315,10 +307,6 @@ function CustomerLayout({ isDark, toggleTheme }) {
                   setSupportMenuPinned((value) => {
                     const nextPinned = !value
                     setSupportMenuOpen(nextPinned)
-
-                    if (nextPinned) {
-                      closeSettingsMenu()
-                    }
 
                     return nextPinned
                   })
@@ -363,6 +351,12 @@ function CustomerLayout({ isDark, toggleTheme }) {
             </SignedOut>
             <SignedIn>
               <div className="header-action-icons" aria-label="Quick actions">
+                <NavLink className="icon-nav-button" to="/wishlist" aria-label="Wishlist" title="Wishlist">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </NavLink>
+
                 <NavLink className="icon-nav-button" to="/cart" aria-label="Cart" title="Cart">
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M3 5h2l2.2 9.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 8H7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -371,58 +365,17 @@ function CustomerLayout({ isDark, toggleTheme }) {
                   </svg>
                 </NavLink>
 
-                <div
-                  className="settings-dropdown"
-                  ref={settingsMenuRef}
-                  onMouseEnter={() => {
-                    if (!settingsPinned) {
-                      setSettingsOpen(true)
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    if (!settingsPinned) {
-                      setSettingsOpen(false)
-                    }
-                  }}
+                <NavLink
+                  className={({ isActive }) => `icon-nav-button${isActive ? ' active' : ''}`}
+                  to="/account"
+                  aria-label="Account"
+                  title="Account"
                 >
-                  <button
-                    type="button"
-                    className="icon-nav-button"
-                    aria-label="Settings menu"
-                    title="Settings"
-                    aria-expanded={settingsOpen}
-                    onClick={() => {
-                      setSettingsPinned((value) => {
-                        const nextPinned = !value
-                        setSettingsOpen(nextPinned)
-
-                        if (nextPinned) {
-                          closeSupportMenu()
-                        }
-
-                        return nextPinned
-                      })
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        closeSettingsMenu()
-                      }
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09A1.65 1.65 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.75" />
-                    </svg>
-                  </button>
-
-                  {settingsOpen ? (
-                    <div className="settings-dropdown-menu" role="menu" aria-label="Settings">
-                      <NavLink className="settings-dropdown-item" to="/account" role="menuitem" onClick={closeSettingsMenu}>
-                        Account Dashboard
-                      </NavLink>
-                    </div>
-                  ) : null}
-                </div>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09A1.65 1.65 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.75" />
+                  </svg>
+                </NavLink>
 
                 <button
                   type="button"
@@ -457,7 +410,7 @@ function CustomerLayout({ isDark, toggleTheme }) {
       <footer className="site-footer">
         <div className="footer-row">
           <div>
-            <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: '15px', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text-primary)' }}>XETA</p>
+            <img className="brand-logo brand-logo-footer" src="/images/xeta-logo.svg" alt="XETA" />
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-footer-text)', lineHeight: 1.6 }}>
               Refined peripherals for focused desks.<br />
               Clerk auth · Laravel API · Cash on delivery.
@@ -472,8 +425,8 @@ function CustomerLayout({ isDark, toggleTheme }) {
           <div className="footer-links">
             <p style={{ margin: '0 0 10px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600, color: 'var(--color-footer-text)' }}>Account</p>
             <NavLink to="/orders">Orders</NavLink>
+            <NavLink to="/wishlist">Wishlist</NavLink>
             <NavLink to="/account">Profile</NavLink>
-            <NavLink to="/settings">Settings</NavLink>
           </div>
         </div>
       </footer>

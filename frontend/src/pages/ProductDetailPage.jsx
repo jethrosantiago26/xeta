@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useSession } from '../context/SessionContext.jsx'
-import { createReview, getOrders, getProduct, readResource, updateReview } from '../lib/api.js'
+import { useWishlist } from '../context/WishlistContext.jsx'
+import { createReview, getAssetUrl, getOrders, getProduct, readResource, updateReview } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
 import { getVariantVisual } from '../lib/variantVisuals.js'
 
@@ -19,6 +20,7 @@ function ProductDetailPage() {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { addItem } = useCart()
+  const { isWishlisted, toggleItem } = useWishlist()
   const [product, setProduct] = useState(null)
   const [selectedVariantId, setSelectedVariantId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -57,7 +59,7 @@ function ProductDetailPage() {
           setReviews(productData.reviews ?? [])
           setSelectedVariantId(String(productData?.variants?.[0]?.id ?? ''))
         }
-      } catch (error) {
+      } catch {
         if (active) {
           setProduct(null)
           setSelectedVariantId('')
@@ -275,6 +277,25 @@ function ProductDetailPage() {
     ? approvedReviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / totalRatings
     : 0
   const roundedAverage = Math.round(averageRating)
+  const productWishlisted = product ? isWishlisted(product) : false
+  const wishlistActionLabel = productWishlisted ? 'Remove from wishlist' : 'Save to wishlist'
+
+  function handleToggleWishlist() {
+    if (!product) {
+      return
+    }
+
+    const result = toggleItem(product)
+
+    if (!result.ok) {
+      setActionMessage('')
+      setActionError('Sign in first to save products to your wishlist.')
+      return
+    }
+
+    setActionError('')
+    setActionMessage(result.saved ? 'Saved to wishlist.' : 'Removed from wishlist.')
+  }
 
   if (loading) {
     return (
@@ -300,7 +321,18 @@ function ProductDetailPage() {
     )
   }
 
-  const image = selectedVariant?.visual?.image || product.primary_image || product.images?.[0]?.url || '/vite.svg'
+  const imageCandidates = [
+    selectedVariant?.image_url,
+    selectedVariant?.attributes?.image_url,
+    selectedVariant?.attributes?.image,
+    selectedVariant?.attributes?.preview_image,
+    selectedVariant?.visual?.image,
+    product.primary_image,
+    product.images?.[0]?.url,
+  ]
+  const imagePath = imageCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim() !== '')
+  const normalizedImagePath = imagePath ? imagePath.trim().replace(/\\/g, '/') : ''
+  const image = imagePath ? getAssetUrl(normalizedImagePath) : '/vite.svg'
   const price = selectedVariant?.price ?? product.lowest_price ?? 0
 
   return (
@@ -412,6 +444,19 @@ function ProductDetailPage() {
               }}
             >
               {selectedVariant?.stock_quantity === 0 ? 'Sold Out' : 'Buy now'}
+            </button>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={handleToggleWishlist}
+              aria-label={wishlistActionLabel}
+              title={wishlistActionLabel}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ width: '16px', height: '16px' }}>
+                <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={productWishlisted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {productWishlisted ? 'Saved' : 'Wishlist'}
             </button>
             <Link className="button button-secondary" to="/cart">
               Go to cart

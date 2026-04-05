@@ -4,7 +4,7 @@ import {
   createAdminProduct,
   createAdminProductVariant,
   deleteAdminProductVariant,
-  getAdminProducts,
+  getAssetUrl,
   getCategories,
   readResource,
   updateAdminProduct,
@@ -45,7 +45,8 @@ function normalizeColorHex(value) {
 }
 
 function extractVariantImageUrl(variant) {
-  return variant?.image_url || variant?.attributes?.image_url || ''
+  const imageUrl = variant?.image_url || variant?.attributes?.image_url || ''
+  return imageUrl ? getAssetUrl(imageUrl) : ''
 }
 
 function readFileAsDataUrl(file) {
@@ -565,7 +566,19 @@ function ProductEditorPanel({ product, onClose, onSaved }) {
                 <div className="product-editor-variant-image-area">
                   {variant.image_preview ? (
                     <div className="product-editor-variant-image-wrap">
-                      <img src={variant.image_preview} alt={`${variant.name} preview`} />
+                      <img src={variant.image_preview} alt="" />
+                      <label className="product-editor-variant-image-change">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            await handleVariantImageChange(index, e.target.files?.[0] ?? null)
+                          }}
+                        />
+                        <ImageIcon size={14} />
+                        <span>Change</span>
+                      </label>
                       <button
                         type="button"
                         className="product-editor-variant-image-remove"

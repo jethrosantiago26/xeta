@@ -11,6 +11,7 @@ use App\Http\Resources\ProductVariantResource;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
+use App\Services\ProductService;
 use App\Services\VariantVisualService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Cache;
 class ProductController extends Controller
 {
     public function __construct(
+        private readonly ProductService $productService,
         private readonly VariantVisualService $variantVisualService,
     ) {
     }
@@ -76,7 +78,7 @@ class ProductController extends Controller
             ]);
         }
 
-        Cache::forget('categories');
+        $this->invalidateCatalogCaches();
 
         return response()->json([
             'message' => 'Product created',
@@ -91,7 +93,7 @@ class ProductController extends Controller
     {
         $productModel = Product::findOrFail($product);
         $productModel->update($request->validated());
-        Cache::forget('categories');
+        $this->invalidateCatalogCaches();
 
         return response()->json([
             'message' => 'Product updated',
@@ -105,7 +107,7 @@ class ProductController extends Controller
     public function destroy(int $product): JsonResponse
     {
         Product::findOrFail($product)->delete();
-        Cache::forget('categories');
+        $this->invalidateCatalogCaches();
 
         return response()->json(['message' => 'Product archived']);
     }
@@ -117,7 +119,7 @@ class ProductController extends Controller
     {
         $productModel = Product::onlyTrashed()->findOrFail($product);
         $productModel->restore();
-        Cache::forget('categories');
+        $this->invalidateCatalogCaches();
 
         return response()->json([
             'message' => 'Product restored',
@@ -132,7 +134,7 @@ class ProductController extends Controller
     {
         $productModel = Product::withTrashed()->findOrFail($product);
         $productModel->forceDelete();
-        Cache::forget('categories');
+        $this->invalidateCatalogCaches();
 
         return response()->json(['message' => 'Product permanently deleted']);
     }
@@ -157,6 +159,7 @@ class ProductController extends Controller
         $variant = $productModel->variants()->create($payload);
         $this->syncProductVariantPrices($productModel, (float) $variant->price);
         $variant->refresh();
+        $this->invalidateCatalogCaches();
 
         return response()->json([
             'message' => 'Variant created',
@@ -206,6 +209,7 @@ class ProductController extends Controller
 
         $this->syncProductVariantPrices($productModel, $targetPrice);
         $variantModel->refresh();
+        $this->invalidateCatalogCaches();
 
         return response()->json([
             'message' => 'Variant updated',
@@ -219,8 +223,15 @@ class ProductController extends Controller
     public function destroyVariant(int $product, int $variant): JsonResponse
     {
         ProductVariant::where('product_id', $product)->findOrFail($variant)->delete();
+        $this->invalidateCatalogCaches();
 
         return response()->json(['message' => 'Variant deleted']);
+    }
+
+    private function invalidateCatalogCaches(): void
+    {
+        Cache::forget('categories');
+        $this->productService->bumpProductListCacheVersion();
     }
 
     private function storeVariantImage(UploadedFile $image): string

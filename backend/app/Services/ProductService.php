@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Cache;
 
 class ProductService
 {
+    private const PRODUCT_LIST_CACHE_VERSION_KEY = 'products.list.version';
+
     /**
      * Get filtered, sorted, paginated products.
      */
@@ -25,7 +27,8 @@ class ProductService
         unset($filters['category']);
 
         $page = request()->query('page', 1);
-        $cacheKey = 'products.list.v4.' . md5(serialize($filters) . '.' . $perPage . '.' . $page);
+            $cacheVersion = max(1, (int) Cache::get(self::PRODUCT_LIST_CACHE_VERSION_KEY, 1));
+            $cacheKey = 'products.list.v5.' . $cacheVersion . '.' . md5(serialize($filters) . '.' . $perPage . '.' . $page);
 
         return Cache::remember($cacheKey, 60 * 60, function () use ($filters, $perPage) {
             $query = Product::active()
@@ -143,6 +146,12 @@ class ProductService
                 ->orderBy('sort_order')
                 ->get();
         });
+    }
+
+    public function bumpProductListCacheVersion(): void
+    {
+        $currentVersion = max(1, (int) Cache::get(self::PRODUCT_LIST_CACHE_VERSION_KEY, 1));
+        Cache::forever(self::PRODUCT_LIST_CACHE_VERSION_KEY, $currentVersion + 1);
     }
 
     private function extractCategorySlugs(array $filters): array

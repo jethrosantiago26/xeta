@@ -248,6 +248,16 @@
   border-bottom-color: var(--landing-primary);
 }
 
+:root[data-theme='light'] .landing-tab-row button {
+  color: rgba(17, 24, 39, 0.74);
+}
+
+:root[data-theme='light'] .landing-tab-row button.active,
+:root[data-theme='light'] .landing-tab-row button:hover {
+  color: #24324f;
+  border-bottom-color: #24324f;
+}
+
 .landing-product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -255,19 +265,27 @@
 }
 
 .landing-product-card {
-  border: 1px solid var(--landing-border-soft);
+  border: 0;
   border-radius: 16px;
   background: linear-gradient(180deg, var(--landing-surface), var(--landing-surface-2));
   padding: 16px;
   display: grid;
   gap: 14px;
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), border-color 260ms ease, box-shadow 260ms ease;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 260ms ease;
 }
 
 .landing-product-card:hover {
   transform: translateY(-5px);
-  border-color: var(--landing-border);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='light'] .landing-product-card {
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.08);
+}
+
+:root[data-theme='light'] .landing-product-card:hover {
+  box-shadow: 0 18px 36px rgba(17, 24, 39, 0.12);
 }
 
 .landing-product-image-wrap {
@@ -390,7 +408,7 @@
   min-height: 460px;
   border-radius: 18px;
   overflow: hidden;
-  border: 1px solid var(--landing-border);
+  border: 0;
   background: linear-gradient(150deg, var(--landing-surface-2), var(--landing-surface));
 }
 
@@ -589,11 +607,15 @@
 .landing-insight-media-card {
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid var(--landing-border);
+  border: 0;
   background: linear-gradient(140deg, var(--landing-surface-3), var(--landing-surface));
   aspect-ratio: 5 / 4;
   min-height: 560px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme='light'] .landing-insight-media-card {
+  box-shadow: 0 14px 32px rgba(17, 24, 39, 0.12);
 }
 
 .landing-insight-media-card img {

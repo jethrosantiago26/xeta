@@ -13,6 +13,7 @@ const adminCoreMenu = [
   { to: '/admin', label: 'Overview' },
   { to: '/admin/products', label: 'Products' },
   { to: '/admin/support', label: 'Support' },
+  { to: '/admin/notifications', label: 'Notifications' },
 ]
 
 const adminCommerceMenu = [
@@ -109,7 +110,7 @@ function AppLayout() {
   const { isDark, toggleTheme } = useTheme()
 
   // Avoid flashing customer navigation while role is still being resolved.
-  if (isSignedIn && (loading || !profile)) {
+  if (isSignedIn && loading) {
     return (
       <div className="page-shell">
         <header className="site-header">

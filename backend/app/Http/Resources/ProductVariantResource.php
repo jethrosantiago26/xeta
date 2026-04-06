@@ -25,7 +25,7 @@ class ProductVariantResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'name' => $this->name,
+            'name' => $this->normalizeDisplayText($this->name),
             'sku' => $this->sku,
             'price' => (float) $this->price,
             'compare_at_price' => $this->compare_at_price ? (float) $this->compare_at_price : null,
@@ -38,6 +38,21 @@ class ProductVariantResource extends JsonResource
             'in_stock' => $this->isInStock(),
             'on_sale' => $this->isOnSale(),
         ];
+    }
+
+    private function normalizeDisplayText(mixed $value): string
+    {
+        $text = trim((string) $value);
+
+        if ($text === '') {
+            return '';
+        }
+
+        $text = preg_replace('/\x{FFFD}+/u', ' - ', $text) ?? $text;
+        $text = preg_replace('/\s*\?{2,}\s*/u', ' - ', $text) ?? $text;
+        $text = preg_replace('/\s{2,}/', ' ', $text) ?? $text;
+
+        return trim($text);
     }
 
     private function normalizeAssetUrl(mixed $url): ?string
@@ -54,6 +69,14 @@ class ProductVariantResource extends JsonResource
             || str_starts_with($value, 'blob:')
         ) {
             return $value;
+        }
+
+        if (str_starts_with($value, '/uploads/')) {
+            return '/storage/' . ltrim(substr($value, strlen('/uploads/')), '/');
+        }
+
+        if (str_starts_with($value, 'uploads/')) {
+            return '/storage/' . ltrim(substr($value, strlen('uploads/')), '/');
         }
 
         return '/' . ltrim($value, '/');

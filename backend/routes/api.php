@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\Admin\SupportTicketController as AdminSupportTicket
 use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Api\Admin\InventoryController as AdminInventoryController;
 use App\Http\Controllers\Api\Admin\AnalyticsController as AdminAnalyticsController;
+use App\Http\Controllers\Api\Admin\NotificationController as AdminNotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -132,6 +133,9 @@ Route::prefix('v1')->group(function () {
 
             // Analytics (admin)
             Route::get('analytics', [AdminAnalyticsController::class, 'index']);
+
+            // Notifications (admin)
+            Route::post('notifications/marketing', [AdminNotificationController::class, 'sendMarketing']);
         });
     });
 });

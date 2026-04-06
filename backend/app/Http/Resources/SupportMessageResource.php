@@ -20,10 +20,37 @@ class SupportMessageResource extends JsonResource
         return [
             'id' => $this->id,
             'message' => $this->message,
-            'image_url' => $this->image_url,
+            'image_url' => $this->normalizeAssetUrl($this->image_url),
             'author_role' => $this->author_role,
             'author_name' => $authorName,
             'created_at' => $this->created_at,
         ];
+    }
+
+    private function normalizeAssetUrl(mixed $url): ?string
+    {
+        $value = trim(str_replace('\\', '/', (string) $url));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (
+            preg_match('/^(https?:)?\/\//i', $value) === 1
+            || str_starts_with($value, 'data:')
+            || str_starts_with($value, 'blob:')
+        ) {
+            return $value;
+        }
+
+        if (str_starts_with($value, '/uploads/')) {
+            return '/storage/' . ltrim(substr($value, strlen('/uploads/')), '/');
+        }
+
+        if (str_starts_with($value, 'uploads/')) {
+            return '/storage/' . ltrim(substr($value, strlen('uploads/')), '/');
+        }
+
+        return '/' . ltrim($value, '/');
     }
 }

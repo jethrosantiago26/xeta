@@ -15,6 +15,7 @@ class OrderService
 
     public function __construct(
         private readonly CartService $cartService,
+        private readonly ResendEmailService $resendEmailService,
     ) {}
 
     /**
@@ -82,14 +83,48 @@ class OrderService
      */
     public function updateStatus(Order $order, string $status): Order
     {
+        $previousStatus = (string) $order->status;
         $order->update(['status' => $status]);
 
         Log::info('Order status updated', [
             'order_id' => $order->id,
+            'previous_status' => $previousStatus,
             'new_status' => $status,
         ]);
 
+        $this->notifyUserAboutStatusChange($order, $previousStatus, $status);
+
         return $order;
+    }
+
+    private function notifyUserAboutStatusChange(Order $order, string $previousStatus, string $newStatus): void
+    {
+        $order->loadMissing('user');
+        $user = $order->user;
+
+        if (!$user?->email || !$user->order_updates) {
+            return;
+        }
+
+        $subject = sprintf('Order %s is now %s', $order->order_number, $this->humanizeStatus($newStatus));
+        $recipientName = $user->first_name ?: ($user->name ?: 'there');
+
+        $body = sprintf(
+            "Hi %s,\n\nYour order %s status changed from %s to %s.\n\nTotal: PHP %s\nPayment method: %s\n\nThank you for shopping with XETA.",
+            $recipientName,
+            $order->order_number,
+            $this->humanizeStatus($previousStatus),
+            $this->humanizeStatus($newStatus),
+            number_format((float) $order->total, 2),
+            $this->humanizeStatus($order->payment_method),
+        );
+
+        $this->resendEmailService->send($user->email, $subject, $body);
+    }
+
+    private function humanizeStatus(string $value): string
+    {
+        return ucfirst(str_replace('_', ' ', $value));
     }
 
     /**

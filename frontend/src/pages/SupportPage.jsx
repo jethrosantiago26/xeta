@@ -11,6 +11,7 @@ import {
   readResource,
   getAssetUrl,
 } from '../lib/api.js'
+import { normalizeOrderItemText, resolveOrderItemImage } from '../lib/orderItemMedia.js'
 
 const REFRESH_INTERVAL_MS = 8000
 
@@ -358,8 +359,8 @@ function SupportPage() {
                           {(order.items ?? []).slice(0, 3).map((item, idx) => (
                             <img
                               key={item.id || idx}
-                              src={item?.variant?.image_url || item?.product?.image_url || '/vite.svg'}
-                              alt={item.product_name}
+                              src={resolveOrderItemImage(item)}
+                              alt={normalizeOrderItemText(item.product_name) || 'Ordered item'}
                               className="support-order-item-thumb"
                               loading="lazy"
                             />
@@ -571,6 +572,7 @@ function SupportPage() {
                   {messages.map((message, index) => {
                     const isMine = isCustomerMessage(message)
                     const isSystem = message.author_role === 'system'
+                    const isAttachmentOnlyMessage = message.message === 'Image attached' || message.message === '📷 Image attached'
                     const prevMsg = messages[index - 1]
                     const showDateSep = !prevMsg ||
                       new Date(message.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString()
@@ -612,14 +614,14 @@ function SupportPage() {
                                       maxWidth: '100%',
                                       maxHeight: 240,
                                       borderRadius: 12,
-                                      marginBottom: message.message && message.message !== '📷 Image attached' ? 8 : 0,
+                                      marginBottom: message.message && !isAttachmentOnlyMessage ? 8 : 0,
                                       cursor: 'pointer',
                                     }}
                                     onClick={() => window.open(getAssetUrl(message.image_url), '_blank')}
                                     loading="lazy"
                                   />
                                 )}
-                                {message.message && message.message !== '📷 Image attached' && (
+                                {message.message && !isAttachmentOnlyMessage && (
                                   <p className="chat-bubble-text">{message.message}</p>
                                 )}
                               </div>

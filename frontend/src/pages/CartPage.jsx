@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { formatMoney } from '../lib/format.js'
+import { normalizeDisplayText, resolveOrderItemImage } from '../lib/orderItemMedia.js'
 
 function getCartItemImage(item) {
-  return item?.variant?.image_url || item?.product?.image || '/vite.svg'
+  return resolveOrderItemImage(item)
 }
 
 function CartPage() {
@@ -46,13 +47,15 @@ function CartPage() {
             {items.map((item) => {
               const image = getCartItemImage(item)
               const colorHex = item?.variant?.color_hex
+              const productName = normalizeDisplayText(item.product?.name) || 'Product'
+              const variantName = normalizeDisplayText(item.variant?.name) || 'Standard variant'
 
               return (
                 <article key={item.id} className="cart-item-card">
                   <div className="cart-item-image-wrap">
                     <img
                       src={image}
-                      alt={item.product?.name || 'Product'}
+                      alt={productName}
                       className="cart-item-image"
                       loading="lazy"
                       decoding="async"
@@ -70,9 +73,9 @@ function CartPage() {
                     <div className="cart-item-info">
                       <div className="cart-item-details">
                         <Link className="cart-item-product-name" to={`/products/${item.product?.slug}`}>
-                          {item.product?.name}
+                          {productName}
                         </Link>
-                        <span className="cart-item-variant-name">{item.variant?.name}</span>
+                        <span className="cart-item-variant-name">{variantName}</span>
                         <span className="cart-item-unit-price">{formatMoney(item.variant?.price)} each</span>
                       </div>
                       <strong className="cart-item-line-total">{formatMoney(item.line_total)}</strong>

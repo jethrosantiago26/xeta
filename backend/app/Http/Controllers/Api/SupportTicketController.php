@@ -84,7 +84,7 @@ class SupportTicketController extends Controller
         $message = $this->supportTicketService->addMessage(
             $ticketModel,
             $request->user(),
-            $messageText ?: '📷 Image attached',
+            $messageText ?: 'Image attached',
             'customer',
             true,
             $imageUrl,
@@ -128,8 +128,14 @@ class SupportTicketController extends Controller
             return null;
         }
 
-        $path = $request->file('image')->store('support-attachments', 'public');
+        $path = Storage::disk('public')->putFile('support-attachments', $request->file('image'));
 
-        return '/storage/' . $path;
+        if (!$path) {
+            throw ValidationException::withMessages([
+                'image' => ['Unable to store the uploaded image. Please try again.'],
+            ]);
+        }
+
+        return '/storage/' . ltrim(str_replace('\\', '/', $path), '/');
     }
 }

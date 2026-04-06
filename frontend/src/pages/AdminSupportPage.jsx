@@ -277,6 +277,7 @@ function AdminSupportPage() {
               <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', background: 'var(--color-surface-2)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {selectedTicket.messages?.map((msg, idx) => {
                   const isStaff = msg.author_role === 'admin' || msg.author_role === 'staff'
+                  const isAttachmentOnlyMessage = msg.message === 'Image attached' || msg.message === '📷 Image attached'
                   return (
                     <div key={idx} style={{ display: 'flex', justifyContent: isStaff ? 'flex-end' : 'flex-start' }}>
                       <div className={`message-bubble ${isStaff ? 'message-staff' : 'message-customer'}`} style={{ maxWidth: '75%' }}>
@@ -289,11 +290,18 @@ function AdminSupportPage() {
                           <img 
                             src={getAssetUrl(msg.image_url)} 
                             alt="Attachment" 
-                            style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '8px', display: 'block' }} 
+                            style={{
+                              maxWidth: '100%',
+                              borderRadius: '8px',
+                              marginBottom: msg.message && !isAttachmentOnlyMessage ? '8px' : 0,
+                              display: 'block',
+                            }} 
                             onClick={() => window.open(getAssetUrl(msg.image_url), '_blank')}
                           />
                         )}
-                        <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.65' }}>{msg.message}</p>
+                        {msg.message && !isAttachmentOnlyMessage && (
+                          <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.65' }}>{msg.message}</p>
+                        )}
                       </div>
                     </div>
                   )

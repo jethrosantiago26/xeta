@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getAssetUrl,
   getProduct,
   getProducts,
   readResource,
 } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
+import { normalizeDisplayText, resolveProductImage } from '../lib/orderItemMedia.js'
 import './HomePage.css'
 
 const TRENDING_TABS = [
@@ -36,55 +36,8 @@ const TECH_FEATURES = [
 ]
 
 function resolveImageUrl(product) {
-  const normalizePath = (value) => {
-    if (typeof value !== 'string') {
-      return null
-    }
-
-    const sanitized = value.trim().replace(/\\/g, '/')
-
-    if (!sanitized) {
-      return null
-    }
-
-    if (sanitized.startsWith('data:')) {
-      return sanitized
-    }
-
-    return getAssetUrl(sanitized)
-  }
-
-  const variantCandidates = Array.isArray(product?.variants)
-    ? product.variants.flatMap((variant) => [
-        variant?.image_url,
-        variant?.image,
-        variant?.attributes?.image_url,
-        variant?.attributes?.image,
-        variant?.attributes?.preview_image,
-      ])
-    : []
-
-  const galleryCandidates = Array.isArray(product?.images)
-    ? product.images.map((image) => image?.url)
-    : []
-
-  const imageCandidates = [
-    product?.primary_image,
-    product?.thumbnail,
-    product?.image_url,
-    ...galleryCandidates,
-    ...variantCandidates,
-  ]
-
-  for (const candidate of imageCandidates) {
-    const resolved = normalizePath(candidate)
-
-    if (resolved) {
-      return resolved
-    }
-  }
-
-  return null
+  const resolved = resolveProductImage(product, { fallbackImage: '' })
+  return resolved || null
 }
 
 function sortByRating(left, right) {
@@ -177,7 +130,9 @@ function HomePage() {
                 id: reviewWithComment.id || `review-${candidate.id}-${index}`,
                 quote: `"${reviewWithComment.comment}"`,
                 author: reviewWithComment.author_name || 'Verified Buyer',
-                role: reviewWithComment.variant?.name || productDetail.category?.name || 'XETA Customer',
+                role: normalizeDisplayText(reviewWithComment.variant?.name)
+                  || productDetail.category?.name
+                  || 'XETA Customer',
                 rating,
               }
             } catch {
@@ -245,13 +200,14 @@ function HomePage() {
     || null
   const featureShowcaseImage = resolveImageUrl(featureShowcaseProduct)
   const featureShowcasePrice = Number(featureShowcaseProduct?.lowest_price ?? featureShowcaseProduct?.variants?.[0]?.price ?? 0)
+  const featureShowcaseName = normalizeDisplayText(featureShowcaseProduct?.name || 'XETA flagship')
 
   const featureInsights = useMemo(
     () => [
       {
         id: 'switch-tech',
         title: 'Next-Gen Magnetic Switch Technology (Hall Effect)',
-        lead: `Unrivaled precision with ${featureShowcaseProduct?.name || 'XETA flagship'} calibration`,
+        lead: `Unrivaled precision with ${featureShowcaseName} calibration`,
         description: `Built for consistency in fast matches with tight actuation control and dependable trigger response at ${featureShowcasePrice > 0 ? formatMoney(featureShowcasePrice) : 'competitive'} pricing.`,
       },
       {
@@ -279,7 +235,7 @@ function HomePage() {
         description: 'Create profiles for play and work, tune per-key behavior, and save settings for quick switching across setups.',
       },
     ],
-    [featureShowcasePrice, featureShowcaseProduct?.name],
+    [featureShowcaseName, featureShowcasePrice],
   )
 
   const reviewCards = testimonials
@@ -377,12 +333,14 @@ function HomePage() {
                 const price = Number(product.lowest_price ?? product.variants?.[0]?.price ?? 0)
                 const compareAtPrice = Number(product.variants?.[0]?.compare_at_price ?? 0)
                 const imageUrl = resolveImageUrl(product)
+                const productName = normalizeDisplayText(product.name)
+                const variantName = normalizeDisplayText(product.variants?.[0]?.name || 'Performance tuned variant')
 
                 return (
                   <article key={product.id} className="landing-product-card">
                     <div className="landing-product-image-wrap">
                       {imageUrl ? (
-                        <img src={imageUrl} alt={product.name} loading="lazy" decoding="async" />
+                        <img src={imageUrl} alt={productName} loading="lazy" decoding="async" />
                       ) : (
                         <div className="landing-image-fallback" aria-hidden="true" />
                       )}
@@ -397,15 +355,15 @@ function HomePage() {
 
                     <div className="landing-product-content">
                       <p>{product.category?.name || 'Peripherals'}</p>
-                      <h3>{product.name}</h3>
-                      <small>{product.variants?.[0]?.name || 'Performance tuned variant'}</small>
+                      <h3>{productName}</h3>
+                      <small>{variantName}</small>
 
                       <div className="landing-product-price-row">
                         <strong>{price > 0 ? formatMoney(price) : 'Coming Soon'}</strong>
                         {compareAtPrice > price ? <span>{formatMoney(compareAtPrice)}</span> : null}
                       </div>
 
-                      <Link className="landing-product-action" to={`/products/${product.slug}`} aria-label={`Open ${product.name}`}>
+                      <Link className="landing-product-action" to={`/products/${product.slug}`} aria-label={`Open ${productName}`}>
                         +
                       </Link>
                     </div>
@@ -423,7 +381,12 @@ function HomePage() {
         <div className="landing-container landing-tech-layout">
           <div className="landing-tech-visual">
             {technicalSpotlightImage ? (
-              <img src={technicalSpotlightImage} alt={topGears[1]?.name || topGears[0]?.name || 'XETA product close-up'} loading="lazy" decoding="async" />
+              <img
+                src={technicalSpotlightImage}
+                alt={normalizeDisplayText(topGears[1]?.name || topGears[0]?.name || 'XETA product close-up')}
+                loading="lazy"
+                decoding="async"
+              />
             ) : (
               <div className="landing-image-fallback" aria-hidden="true" />
             )}
@@ -526,7 +489,7 @@ function HomePage() {
               {featureShowcaseImage ? (
                 <img
                   src={featureShowcaseImage}
-                  alt={featureShowcaseProduct?.name || 'XETA featured hardware'}
+                  alt={featureShowcaseName || 'XETA featured hardware'}
                   loading="lazy"
                   decoding="async"
                 />

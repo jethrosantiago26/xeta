@@ -33,7 +33,8 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Keep disabled so custom /storage media fallback routes can handle public assets.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

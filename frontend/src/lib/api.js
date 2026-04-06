@@ -283,8 +283,43 @@ export async function getAdminAnalytics(params = {}) {
   return api.get('/admin/analytics', { params })
 }
 
+export async function sendAdminMarketingNotification(payload) {
+  return api.post('/admin/notifications/marketing', payload)
+}
+
 export function readResource(response) {
   return response.data
+}
+
+function normalizeAssetPath(path) {
+  const normalized = String(path)
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+
+  if (!normalized) {
+    return ''
+  }
+
+  if (normalized.startsWith('/')) {
+    return normalized
+  }
+
+  return `/${normalized}`
+}
+
+function normalizeLegacyAssetPath(path) {
+  let candidate = normalizeAssetPath(path)
+
+  if (!candidate) {
+    return ''
+  }
+
+  candidate = candidate.replace(/^\/public\/storage\//i, '/storage/')
+  candidate = candidate.replace(/^\/storage\/app\/public\//i, '/storage/')
+  candidate = candidate.replace(/^\/uploads\//i, '/storage/')
+
+  return candidate
 }
 
 export function getAssetUrl(path) {
@@ -308,14 +343,15 @@ export function getAssetUrl(path) {
     return rawPath
   }
 
-  const normalizedPath = rawPath.replace(/\\/g, '/').replace(/^\.\//, '')
-  const baseUrl = api.defaults.baseURL.replace(/\/api\/v1\/?$/, '')
+  const normalizedPath = normalizeLegacyAssetPath(rawPath)
 
-  if (normalizedPath.startsWith('/')) {
-    return `${baseUrl}${normalizedPath}`
+  if (!normalizedPath) {
+    return ''
   }
 
-  return `${baseUrl}/${normalizedPath}`
+  const baseUrl = api.defaults.baseURL.replace(/\/api\/v1\/?$/, '')
+
+  return `${baseUrl}${normalizedPath}`
 }
 
 export default api

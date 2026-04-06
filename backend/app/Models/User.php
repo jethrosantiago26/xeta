@@ -37,6 +37,9 @@ class User extends Authenticatable
         'location_source',
         'location_updated_at',
         'role',
+        'order_updates',
+        'security_alerts',
+        'marketing_emails',
     ];
 
     protected $hidden = [];
@@ -48,6 +51,9 @@ class User extends Authenticatable
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'location_updated_at' => 'datetime',
+            'order_updates' => 'boolean',
+            'security_alerts' => 'boolean',
+            'marketing_emails' => 'boolean',
         ];
     }
 

@@ -6,12 +6,13 @@ use App\Models\SupportMessage;
 use App\Models\SupportTicket;
 use App\Models\User;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class SupportTicketService
 {
+    public function __construct(
+        private readonly ResendEmailService $resendEmailService,
+    ) {}
+
     public function createTicket(User $user, array $payload, ?string $imageUrl = null): SupportTicket
     {
         $ticket = SupportTicket::create([
@@ -186,44 +187,6 @@ class SupportTicketService
 
     private function sendEmail(string|array $to, string $subject, string $text): void
     {
-        $key = config('services.resend.key');
-        $from = config('services.resend.from');
-
-        if (!$key || !$from) {
-            Log::warning('Resend email not sent: missing configuration.');
-            return;
-        }
-
-        $recipients = is_array($to)
-            ? array_values(array_filter(array_map('trim', $to)))
-            : [trim($to)];
-
-        if (empty($recipients)) {
-            return;
-        }
-
-        try {
-            $response = Http::withToken($key)
-                ->post('https://api.resend.com/emails', [
-                    'from' => $from,
-                    'to' => $recipients,
-                    'subject' => $subject,
-                    'text' => $text,
-                ]);
-
-            if (!$response->successful()) {
-                Log::warning('Resend email failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                    'to' => $recipients,
-                    'subject' => Str::limit($subject, 120),
-                ]);
-            }
-        } catch (\Throwable $error) {
-            Log::warning('Resend email exception', [
-                'message' => $error->getMessage(),
-                'to' => $recipients,
-            ]);
-        }
+        $this->resendEmailService->send($to, $subject, $text);
     }
 }

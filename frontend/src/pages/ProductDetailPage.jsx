@@ -4,8 +4,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useSession } from '../context/SessionContext.jsx'
 import { useWishlist } from '../context/WishlistContext.jsx'
-import { createReview, getAssetUrl, getOrders, getProduct, readResource, updateReview } from '../lib/api.js'
+import { createReview, getOrders, getProduct, readResource, updateReview } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
+import { normalizeDisplayText, resolveProductImage } from '../lib/orderItemMedia.js'
 import { getVariantVisual } from '../lib/variantVisuals.js'
 
 function formatSpecLabel(key) {
@@ -321,30 +322,21 @@ function ProductDetailPage() {
     )
   }
 
-  const imageCandidates = [
-    selectedVariant?.image_url,
-    selectedVariant?.attributes?.image_url,
-    selectedVariant?.attributes?.image,
-    selectedVariant?.attributes?.preview_image,
-    selectedVariant?.visual?.image,
-    product.primary_image,
-    product.images?.[0]?.url,
-  ]
-  const imagePath = imageCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim() !== '')
-  const normalizedImagePath = imagePath ? imagePath.trim().replace(/\\/g, '/') : ''
-  const image = imagePath ? getAssetUrl(normalizedImagePath) : '/vite.svg'
+  const image = resolveProductImage(product, { variant: selectedVariant })
+  const productName = normalizeDisplayText(product.name) || 'Product'
+  const selectedVariantName = normalizeDisplayText(selectedVariant?.name) || 'Standard variant'
   const price = selectedVariant?.price ?? product.lowest_price ?? 0
 
   return (
     <div className="page-grid">
       <section className="hero-panel">
         <div className="hero-media">
-          <img src={image} alt={product.name} />
+          <img src={image} alt={productName} />
         </div>
 
         <div className="stack">
           <p className="eyebrow">{product.category?.name ?? 'Peripheral'}</p>
-          <h1>{product.name}</h1>
+          <h1>{productName}</h1>
           <p className="lede">{product.description}</p>
           <div className="row">
             <span className="price">{formatMoney(price)}</span>
@@ -361,6 +353,7 @@ function ProductDetailPage() {
             <div className="variant-meatballs" role="radiogroup" aria-label="Choose product variant">
               {visualVariants.map((variant) => {
                 const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+                const variantName = normalizeDisplayText(variant.name) || 'Variant'
 
                 return (
                   <button
@@ -368,7 +361,7 @@ function ProductDetailPage() {
                     type="button"
                     role="radio"
                     aria-checked={isActive}
-                    aria-label={`${variant.name} ${formatMoney(variant.price)}`}
+                    aria-label={`${variantName} ${formatMoney(variant.price)}`}
                     className={`variant-meatball${isActive ? ' active' : ''}`}
                     style={{
                       '--variant-color': variant.visual.color,
@@ -382,7 +375,7 @@ function ProductDetailPage() {
             </div>
             {selectedVariant ? (
               <div className="variant-selection-summary">
-                <span>{selectedVariant.name}</span>
+                <span>{selectedVariantName}</span>
                 <span>{formatMoney(selectedVariant.price)}</span>
               </div>
             ) : null}
@@ -391,7 +384,7 @@ function ProductDetailPage() {
           {selectedVariant ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p className="muted" style={{ margin: 0 }}>
-                Selected: {selectedVariant.name}
+                Selected: {selectedVariantName}
               </p>
               
               <div className="stock-status" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
@@ -549,7 +542,7 @@ function ProductDetailPage() {
                     </div>
 
                     {review.variant?.name ? (
-                      <span className="review-variant-pill">{review.variant.name}</span>
+                      <span className="review-variant-pill">{normalizeDisplayText(review.variant.name)}</span>
                     ) : null}
 
                     <p className={`review-comment${review.comment ? '' : ' review-comment-empty'}`}>
@@ -697,13 +690,13 @@ function ProductDetailPage() {
             <div className="cart-bottom-sheet-header">
               <img 
                 src={image} 
-                alt={selectedVariant.name} 
+                alt={selectedVariantName} 
                 className="cart-bottom-sheet-visual" 
               />
               <div className="cart-bottom-sheet-details">
-                <h3 style={{ margin: 0, fontSize: '18px' }}>{product.name}</h3>
+                <h3 style={{ margin: 0, fontSize: '18px' }}>{productName}</h3>
                 <p className="muted" style={{ margin: 0, fontSize: '14px' }}>
-                  {selectedVariant.name} · {formatMoney(price)}
+                  {selectedVariantName} · {formatMoney(price)}
                 </p>
               </div>
             </div>

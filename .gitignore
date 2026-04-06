@@ -22,3 +22,11 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+.vercel
+.env*.local
+.tmp/
+lighthouse-*.json
+localhost_*.json
+lighthouse-reports/
+frontend/lh-preview-*.json

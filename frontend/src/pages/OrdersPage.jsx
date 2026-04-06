@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader.jsx'
 import { useSession } from '../context/SessionContext.jsx'
 import { getOrders, readResource } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
+import { normalizeOrderItemText, resolveOrderItemImage } from '../lib/orderItemMedia.js'
 
 const REFRESH_INTERVAL_MS = 12000
 const ORDER_STEPS = ['pending', 'processing', 'shipped', 'delivered']
@@ -53,10 +54,6 @@ function formatOrderDate(dateValue) {
     month: 'short',
     day: 'numeric',
   })
-}
-
-function getOrderItemImage(item) {
-  return item?.variant?.image_url || item?.product?.image_url || '/vite.svg'
 }
 
 function formatRatingStars(ratingValue) {
@@ -339,8 +336,8 @@ function OrdersPage() {
                         return (
                           <div key={item.id} className="order-item-card">
                             <img
-                              src={getOrderItemImage(item)}
-                              alt={item.product_name}
+                              src={resolveOrderItemImage(item)}
+                              alt={normalizeOrderItemText(item.product_name) || 'Ordered item'}
                               className="order-item-thumb"
                               loading="lazy"
                               decoding="async"
@@ -348,8 +345,10 @@ function OrdersPage() {
                             <div className="order-item-content">
                               <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div>
-                                  <p className="order-item-name">{item.product_name}</p>
-                                  <p className="muted order-item-variant">{item.variant_name}</p>
+                                  <p className="order-item-name">{normalizeOrderItemText(item.product_name)}</p>
+                                  <p className="muted order-item-variant">
+                                    {normalizeOrderItemText(item.variant_name) || 'Standard variant'}
+                                  </p>
                                 </div>
                                 <p className="order-item-total">{formatMoney(item.total)}</p>
                               </div>

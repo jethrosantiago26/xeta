@@ -25,7 +25,6 @@ class ProductController extends Controller
             'category', 'categories', 'min_price', 'max_price',
             'in_stock', 'search', 'sort',
         ]);
-        $categorySlugs = $this->extractCategorySlugs($filters);
 
         $products = $this->productService->getProducts(
             $filters,
@@ -35,12 +34,8 @@ class ProductController extends Controller
         $boundsQuery = ProductVariant::query()
             ->active()
             ->where('condition', 'new')
-            ->whereHas('product', function ($query) use ($filters, $categorySlugs) {
+            ->whereHas('product', function ($query) use ($filters) {
                 $query->active();
-
-                if (!empty($categorySlugs)) {
-                    $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->whereIn('slug', $categorySlugs));
-                }
 
                 if (!empty($filters['search'])) {
                     $query->where('name', 'like', '%' . $filters['search'] . '%');
@@ -75,25 +70,5 @@ class ProductController extends Controller
     {
         $product = $this->productService->getBySlug($slug);
         return new ProductResource($product);
-    }
-
-    private function extractCategorySlugs(array $filters): array
-    {
-        $rawCategories = $filters['categories'] ?? ($filters['category'] ?? []);
-
-        if (is_string($rawCategories)) {
-            $rawCategories = explode(',', $rawCategories);
-        }
-
-        if (!is_array($rawCategories)) {
-            $rawCategories = [$rawCategories];
-        }
-
-        $slugs = array_map(
-            static fn ($value) => trim((string) $value),
-            $rawCategories,
-        );
-
-        return array_values(array_unique(array_filter($slugs)));
     }
 }

@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useWishlist } from '../context/WishlistContext.jsx'
-import { getAssetUrl } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
+import { normalizeDisplayText, resolveProductImage } from '../lib/orderItemMedia.js'
 import { getVariantVisual } from '../lib/variantVisuals.js'
 
 function ProductCard({
@@ -26,7 +26,7 @@ function ProductCard({
       ...variant,
       visual: getVariantVisual(variant, {
         index,
-        productName: product.name,
+        productName: normalizeDisplayText(product.name),
       }),
     }))
   }, [product])
@@ -48,37 +48,11 @@ function ProductCard({
       ?? null
   }, [visualVariants, selectedVariantId])
 
-  const variantImageCandidates = visualVariants.flatMap((variant) => [
-    variant?.image_url,
-    variant?.attributes?.image_url,
-    variant?.attributes?.image,
-    variant?.attributes?.preview_image,
-  ])
-  const galleryImageCandidates = Array.isArray(product.images)
-    ? product.images.map((imageEntry) => imageEntry?.url)
-    : []
-  const generatedVariantPreview = selectedVariant?.visual?.image
-
   const productPath = `/products/${product.slug}`
   const isRowLayout = layout === 'row'
-  const imageCandidates = [
-    selectedVariant?.image_url,
-    selectedVariant?.attributes?.image_url,
-    selectedVariant?.attributes?.image,
-    selectedVariant?.attributes?.preview_image,
-    product.primary_image,
-    product.image_url,
-    ...galleryImageCandidates,
-    ...variantImageCandidates,
-    generatedVariantPreview,
-  ]
-  const imagePath = imageCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim() !== '')
-  const normalizedImagePath = imagePath ? imagePath.trim().replace(/\\/g, '/') : ''
-  const image = imagePath
-    ? normalizedImagePath.startsWith('data:')
-      ? normalizedImagePath
-      : getAssetUrl(normalizedImagePath)
-    : '/vite.svg'
+  const image = resolveProductImage(product, { variant: selectedVariant })
+  const productName = normalizeDisplayText(product.name) || 'Product'
+  const selectedVariantName = normalizeDisplayText(selectedVariant?.name) || 'Standard variant'
   const price = selectedVariant?.price ?? product.lowest_price ?? product.variants?.[0]?.price ?? 0
   const reviewCount = Number(product.review_count ?? 0)
   const reviewLabel = reviewCount === 1 ? '1 review' : `${reviewCount} reviews`
@@ -95,6 +69,10 @@ function ProductCard({
   const feedbackMessage = actionError || actionMessage
   const inWishlist = isWishlisted(product)
   const wishlistLabel = inWishlist ? 'Remove from wishlist' : 'Save to wishlist'
+
+  function getVariantNameLabel(variant) {
+    return normalizeDisplayText(variant?.name) || 'Variant'
+  }
 
   useEffect(() => {
     if (!showQuickView) {
@@ -261,13 +239,13 @@ function ProductCard({
             <div className="cart-bottom-sheet-header">
               <img
                 src={image}
-                alt={selectedVariant.name}
+                alt={selectedVariantName}
                 className="cart-bottom-sheet-visual"
               />
               <div className="cart-bottom-sheet-details">
-                <h3 style={{ margin: 0, fontSize: '18px' }}>{product.name}</h3>
+                <h3 style={{ margin: 0, fontSize: '18px' }}>{productName}</h3>
                 <p className="muted" style={{ margin: 0, fontSize: '14px' }}>
-                  {selectedVariant.name} · {formatMoney(price)}
+                  {selectedVariantName} · {formatMoney(price)}
                 </p>
               </div>
             </div>
@@ -335,7 +313,7 @@ function ProductCard({
             className="quick-view-modal"
             role="dialog"
             aria-modal="true"
-            aria-label={`Quick view: ${product.name}`}
+            aria-label={`Quick view: ${productName}`}
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -351,20 +329,21 @@ function ProductCard({
             </button>
 
             <div className="quick-view-media">
-              <img src={image} alt={product.name} loading="lazy" decoding="async" />
+              <img src={image} alt={productName} loading="lazy" decoding="async" />
             </div>
 
             <div className="quick-view-content">
               <p className="quick-view-kicker">{product.category?.name ?? 'Peripherals'}</p>
-              <h3 className="quick-view-title">{product.name}</h3>
+              <h3 className="quick-view-title">{productName}</h3>
               <p className="quick-view-price">{priceLabel}</p>
 
               {hasMultipleVariants ? (
                 <div className="quick-view-block">
                   <p className="quick-view-label">Color</p>
-                  <div className="quick-view-color-options" role="radiogroup" aria-label={`Choose ${product.name} color`}>
+                  <div className="quick-view-color-options" role="radiogroup" aria-label={`Choose ${productName} color`}>
                     {visualVariants.map((variant) => {
                       const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+                      const variantName = getVariantNameLabel(variant)
 
                       return (
                         <button
@@ -372,8 +351,8 @@ function ProductCard({
                           type="button"
                           role="radio"
                           aria-checked={isActive}
-                          aria-label={variant.name}
-                          title={variant.name}
+                          aria-label={variantName}
+                          title={variantName}
                           className={`quick-view-color-dot${isActive ? ' active' : ''}`}
                           style={{
                             '--variant-color': variant.visual.color,
@@ -386,7 +365,7 @@ function ProductCard({
                       )
                     })}
                   </div>
-                  {selectedVariant ? <p className="quick-view-selected-color">{selectedVariant.name}</p> : null}
+                  {selectedVariant ? <p className="quick-view-selected-color">{selectedVariantName}</p> : null}
                 </div>
               ) : null}
 
@@ -475,14 +454,14 @@ function ProductCard({
           className="product-card product-card-row product-card-clickable"
           role="link"
           tabIndex={0}
-          aria-label={`View ${product.name}`}
+          aria-label={`View ${productName}`}
           onClick={handleCardNavigate}
           onKeyDown={handleCardKeyDown}
         >
           <div className="product-card-media product-card-row-media">
             <img
               src={image}
-              alt={product.name}
+              alt={productName}
               loading={prioritizeImage ? 'eager' : 'lazy'}
               fetchPriority={imageFetchPriority}
               decoding="async"
@@ -531,7 +510,7 @@ function ProductCard({
               </div>
             </div>
 
-            <h3 className="product-card-row-title">{product.name}</h3>
+            <h3 className="product-card-row-title">{productName}</h3>
             <p className="product-card-row-description">
               {product.description?.slice(0, 200) || 'High quality peripherals for work and play.'}
             </p>
@@ -539,7 +518,7 @@ function ProductCard({
             <div className="row product-card-row-price-row" style={{ justifyContent: 'space-between' }}>
               <strong className="price">{priceLabel}</strong>
               {selectedVariant ? (
-                <span className="product-card-row-variant-label">{selectedVariant.name}</span>
+                <span className="product-card-row-variant-label">{selectedVariantName}</span>
               ) : null}
             </div>
           </div>
@@ -547,9 +526,10 @@ function ProductCard({
           <div className="product-card-row-actions">
             {hasMultipleVariants ? (
               <div className="product-card-variant-row">
-                <div className="product-card-variant-menu" role="radiogroup" aria-label={`Choose ${product.name} variant preview`}>
+                <div className="product-card-variant-menu" role="radiogroup" aria-label={`Choose ${productName} variant preview`}>
                   {visualVariants.map((variant) => {
                     const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+                    const variantName = getVariantNameLabel(variant)
 
                     return (
                       <button
@@ -557,7 +537,7 @@ function ProductCard({
                         type="button"
                         role="radio"
                         aria-checked={isActive}
-                        aria-label={`${variant.name} ${formatMoney(variant.price)}`}
+                        aria-label={`${variantName} ${formatMoney(variant.price)}`}
                         className={`product-card-meatball${isActive ? ' active' : ''}`}
                         style={{
                           '--variant-color': variant.visual.color,
@@ -609,14 +589,14 @@ function ProductCard({
         className={`product-card product-card-clickable${uniformCardDesign ? ' product-card-uniform' : ''}`}
         role="link"
         tabIndex={0}
-        aria-label={`View ${product.name}`}
+        aria-label={`View ${productName}`}
         onClick={handleCardNavigate}
         onKeyDown={handleCardKeyDown}
       >
         <div className="product-card-media">
           <img
             src={image}
-            alt={product.name}
+            alt={productName}
             loading={prioritizeImage ? 'eager' : 'lazy'}
             fetchPriority={imageFetchPriority}
             decoding="async"
@@ -673,7 +653,7 @@ function ProductCard({
               <span className="product-card-review-count">{reviewLabel}</span>
             </div>
           ) : null}
-          <h2 style={{ fontSize: '13px', lineHeight: 1.35 }}>{product.name}</h2>
+          <h2 style={{ fontSize: '13px', lineHeight: 1.35 }}>{productName}</h2>
           {showDescription ? (
             <p className="muted" style={{ fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {product.description?.slice(0, 100) || 'High quality peripherals for work and play.'}
@@ -681,9 +661,10 @@ function ProductCard({
           ) : null}
           <div className="product-card-variant-row">
             {hasMultipleVariants ? (
-              <div className="product-card-variant-menu" role="radiogroup" aria-label={`Choose ${product.name} variant preview`}>
+              <div className="product-card-variant-menu" role="radiogroup" aria-label={`Choose ${productName} variant preview`}>
                 {visualVariants.map((variant) => {
                   const isActive = String(variant.id) === String(selectedVariant?.id ?? '')
+                  const variantName = getVariantNameLabel(variant)
 
                   return (
                     <button
@@ -691,7 +672,7 @@ function ProductCard({
                       type="button"
                       role="radio"
                       aria-checked={isActive}
-                      aria-label={`${variant.name} ${formatMoney(variant.price)}`}
+                      aria-label={`${variantName} ${formatMoney(variant.price)}`}
                       className={`product-card-meatball${isActive ? ' active' : ''}`}
                       style={{
                         '--variant-color': variant.visual.color,

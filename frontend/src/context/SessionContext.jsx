@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { getMe, setApiAuthToken, syncAuth, updateProfile } from '../lib/api.js'
@@ -129,17 +130,27 @@ export function SessionProvider({ children }) {
         return
       }
 
+      setLoading(true)
+
       const cachedProfile = readCachedProfile(userId)
       if (cachedProfile) {
         setProfile(cachedProfile)
       } else {
-        setLoading(true)
+        setProfile(null)
       }
 
       try {
-        console.debug('[SessionContext] Loading auth token...')
-        const token = await getToken()
-        setApiAuthToken(token)
+        const applyToken = async (skipCache = false) => {
+          console.debug('[SessionContext] Loading auth token...')
+          const token = skipCache
+            ? await getToken({ skipCache: true })
+            : await getToken()
+
+          setApiAuthToken(token)
+          return token
+        }
+
+        await applyToken()
 
         let response = null
 
@@ -150,13 +161,21 @@ export function SessionProvider({ children }) {
           // First-time accounts may not exist yet in the backend; sync and retry.
           console.debug('[SessionContext] Profile fetch failed. Syncing and retrying...')
 
+          let recovered = false
+
           try {
             await syncAuth()
+            response = await getMe()
+            recovered = true
           } catch {
-            // Continue to retry getMe so the original profile error path is preserved.
+            // Continue with a fresh-token retry path.
           }
 
-          response = await getMe()
+          if (!recovered) {
+            await applyToken(true)
+            await syncAuth()
+            response = await getMe()
+          }
         }
 
         const currentUser = normalizeUser(response.data)
@@ -188,7 +207,7 @@ export function SessionProvider({ children }) {
           })
       } catch {
         if (active) {
-          setProfile(null)
+          setProfile(cachedProfile ?? null)
         }
       } finally {
         if (active) {
@@ -202,7 +221,7 @@ export function SessionProvider({ children }) {
     return () => {
       active = false
     }
-  }, [getToken, isLoaded, isSignedIn])
+  }, [getToken, isLoaded, isSignedIn, userId])
 
   const value = {
     profile,

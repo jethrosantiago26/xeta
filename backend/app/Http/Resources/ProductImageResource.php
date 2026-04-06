@@ -34,6 +34,14 @@ class ProductImageResource extends JsonResource
             return $value;
         }
 
+        if (str_starts_with($value, '/uploads/')) {
+            return '/storage/' . ltrim(substr($value, strlen('/uploads/')), '/');
+        }
+
+        if (str_starts_with($value, 'uploads/')) {
+            return '/storage/' . ltrim(substr($value, strlen('uploads/')), '/');
+        }
+
         return '/' . ltrim($value, '/');
     }
 }

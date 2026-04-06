@@ -1,7 +1,7 @@
 import React from 'react'
 import { X, Package, Truck, CreditCard, User, Clock, CheckCircle2, Circle, XCircle } from 'lucide-react'
 import { formatMoney } from '../lib/format'
-import { getAssetUrl } from '../lib/api'
+import { normalizeOrderItemText, resolveOrderItemImage } from '../lib/orderItemMedia'
 
 const ORDER_STEPS = [
   { key: 'pending', label: 'Pending', icon: Clock },
@@ -133,14 +133,16 @@ function OrderDetailsPanel({ order, onClose, onUpdateStatus, onArchive, onRestor
                 borderBottom: idx === order.items.length - 1 ? 'none' : '1px solid var(--color-border)'
               }}>
                 <img 
-                  src={getAssetUrl(item.variant?.image_url || item.product?.image_url)} 
-                  alt={item.product_name}
+                  src={resolveOrderItemImage(item)}
+                  alt={normalizeOrderItemText(item.product_name) || 'Ordered item'}
                   className="order-detail-item-image"
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '2px' }}>{item.product_name}</div>
+                  <div style={{ fontWeight: 500, fontSize: '14px', marginBottom: '2px' }}>
+                    {normalizeOrderItemText(item.product_name)}
+                  </div>
                   <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                    {item.variant_name} × {item.quantity}
+                    {(normalizeOrderItemText(item.variant_name) || 'Standard variant')} × {item.quantity}
                   </div>
                 </div>
                 <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap' }}>{formatMoney(item.total)}</div>

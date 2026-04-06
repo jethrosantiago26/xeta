@@ -36,9 +36,24 @@ class ReviewResource extends JsonResource
             'product' => $this->whenLoaded('product'),
             'variant' => $this->whenLoaded('variant', fn () => [
                 'id' => $this->variant?->id,
-                'name' => $this->variant?->name,
+                'name' => $this->normalizeDisplayText($this->variant?->name),
                 'sku' => $this->variant?->sku,
             ]),
         ];
+    }
+
+    private function normalizeDisplayText(mixed $value): string
+    {
+        $text = trim((string) $value);
+
+        if ($text === '') {
+            return '';
+        }
+
+        $text = preg_replace('/\x{FFFD}+/u', ' - ', $text) ?? $text;
+        $text = preg_replace('/\s*\?{2,}\s*/u', ' - ', $text) ?? $text;
+        $text = preg_replace('/\s{2,}/', ' ', $text) ?? $text;
+
+        return trim($text);
     }
 }

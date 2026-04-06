@@ -33,10 +33,6 @@ function parseCoordinate(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-
-
-const SETTINGS_STORAGE_KEY = 'xeta:user-settings:v1'
-
 const defaultSettings = {
   order_updates: true,
   security_alerts: true,
@@ -50,22 +46,31 @@ function AccountPage() {
   const isAdmin = profile?.role === 'admin'
   const [activeTab, setActiveTab] = useState('profile')
 
-  const [settings, setSettings] = useState(() => {
-    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY)
-    if (!saved) return defaultSettings
-    try {
-      const parsed = JSON.parse(saved)
-      return { ...defaultSettings, ...parsed }
-    } catch {
-      return defaultSettings
-    }
-  })
+  const [settings, setSettings] = useState(defaultSettings)
+  const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState('')
+  const [settingsError, setSettingsError] = useState('')
 
-  function handleSaveSettings() {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings))
-    setSettingsMessage('Settings saved.')
-    setTimeout(() => setSettingsMessage(''), 3000)
+  async function handleSaveSettings() {
+    setSettingsSaving(true)
+    setSettingsError('')
+    setSettingsMessage('')
+
+    try {
+      await updateProfile({
+        order_updates: settings.order_updates,
+        security_alerts: settings.security_alerts,
+        marketing_emails: settings.marketing_emails,
+      })
+
+      await refreshProfile()
+      setSettingsMessage('Settings saved.')
+      setTimeout(() => setSettingsMessage(''), 3000)
+    } catch (saveError) {
+      setSettingsError(extractRequestError(saveError, 'Notification settings could not be saved right now.'))
+    } finally {
+      setSettingsSaving(false)
+    }
   }
 
   const [loading, setLoading] = useState(false)
@@ -98,11 +103,18 @@ function AccountPage() {
       return
     }
 
+    setSettings({
+      ...defaultSettings,
+      order_updates: profile.order_updates ?? defaultSettings.order_updates,
+      security_alerts: profile.security_alerts ?? defaultSettings.security_alerts,
+      marketing_emails: profile.marketing_emails ?? defaultSettings.marketing_emails,
+    })
+
     setForm({
       first_name: profile.first_name ?? '',
       last_name: profile.last_name ?? '',
       username: profile.username ?? '',
-      phone: profile.phone ?? '',
+      phone: isAdmin ? '' : (profile.phone ?? ''),
       address_line1: isAdmin ? '' : (profile.address_line1 ?? ''),
       address_line2: isAdmin ? '' : (profile.address_line2 ?? ''),
       city: profile.city ?? '',
@@ -116,6 +128,12 @@ function AccountPage() {
       location_source: profile.location_source ?? '',
     })
   }, [profile, isAdmin])
+
+  useEffect(() => {
+    if (isAdmin && activeTab !== 'profile') {
+      setActiveTab('profile')
+    }
+  }, [activeTab, isAdmin])
 
   useEffect(() => {
     if (isAdmin) {
@@ -258,6 +276,7 @@ function AccountPage() {
         name: fullName,
         first_name: firstName,
         last_name: lastName,
+        phone: isAdmin ? null : form.phone.trim(),
         address_line1: isAdmin ? '' : form.address_line1.trim(),
         address_line2: isAdmin ? '' : form.address_line2.trim(),
         city: isAdmin ? '' : form.city,
@@ -300,18 +319,20 @@ function AccountPage() {
           >
             Profile
           </button>
-          <button
-            className={`tab-link ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-            style={{
-              background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
-              color: activeTab === 'settings' ? 'var(--color-primary)' : 'var(--color-text-muted)',
-              borderBottom: activeTab === 'settings' ? '2px solid var(--color-primary)' : '2px solid transparent',
-              fontWeight: 600, fontSize: '0.9rem'
-            }}
-          >
-            Preferences & Settings
-          </button>
+          {!isAdmin ? (
+            <button
+              className={`tab-link ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+              style={{
+                background: 'none', border: 'none', padding: '12px 16px', cursor: 'pointer',
+                color: activeTab === 'settings' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                borderBottom: activeTab === 'settings' ? '2px solid var(--color-primary)' : '2px solid transparent',
+                fontWeight: 600, fontSize: '0.9rem'
+              }}
+            >
+              Preferences & Settings
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -354,7 +375,7 @@ function AccountPage() {
           ) : null}
         </aside>
 
-        {activeTab === 'profile' ? (
+        {activeTab === 'profile' || isAdmin ? (
           <section className="content-card account-form-card">
             <div className="section-label">
               <div>
@@ -402,15 +423,17 @@ function AccountPage() {
                 />
               </div>
 
-              <div className="stack" style={{ gap: '5px' }}>
-                <label className="caption">Phone number</label>
-                <input
-                  className="input"
-                  placeholder="Phone number"
-                  value={form.phone}
-                  onChange={(event) => setForm({ ...form, phone: event.target.value })}
-                />
-              </div>
+              {!isAdmin ? (
+                <div className="stack" style={{ gap: '5px' }}>
+                  <label className="caption">Phone number</label>
+                  <input
+                    className="input"
+                    placeholder="Phone number"
+                    value={form.phone}
+                    onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                  />
+                </div>
+              ) : null}
               {!isAdmin ? (
                 <div className="account-address-autocomplete">
                   <input
@@ -544,10 +567,11 @@ function AccountPage() {
               </div>
             </article>
             <section className="content-card settings-actions">
-              <button type="button" className="button button-primary" onClick={handleSaveSettings}>
-                Save settings
+              <button type="button" className="button button-primary" onClick={handleSaveSettings} disabled={settingsSaving}>
+                {settingsSaving ? 'Saving settings...' : 'Save settings'}
               </button>
               {settingsMessage ? <div className="notice success">{settingsMessage}</div> : null}
+              {settingsError ? <div className="notice error">{settingsError}</div> : null}
             </section>
           </div>
         )}

@@ -18,6 +18,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -59,19 +61,17 @@ class ProductController extends Controller
         $product = Product::create($validated);
 
         if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $destination = public_path('uploads/products');
+            $storedPath = Storage::disk('public')->putFile('products', $request->file('image'));
 
-            if (!is_dir($destination)) {
-                mkdir($destination, 0755, true);
+            if (!$storedPath) {
+                throw ValidationException::withMessages([
+                    'image' => ['Unable to store the uploaded image. Please try again.'],
+                ]);
             }
-
-            $filename = $image->hashName();
-            $image->move($destination, $filename);
 
             ProductImage::create([
                 'product_id' => $product->id,
-                'url' => '/uploads/products/' . $filename,
+                'url' => '/storage/' . ltrim(str_replace('\\', '/', $storedPath), '/'),
                 'alt_text' => $product->name,
                 'sort_order' => 0,
                 'is_primary' => true,
@@ -236,16 +236,15 @@ class ProductController extends Controller
 
     private function storeVariantImage(UploadedFile $image): string
     {
-        $destination = public_path('uploads/variants');
+        $storedPath = Storage::disk('public')->putFile('variants', $image);
 
-        if (!is_dir($destination)) {
-            mkdir($destination, 0755, true);
+        if (!$storedPath) {
+            throw ValidationException::withMessages([
+                'image' => ['Unable to store the uploaded image. Please try again.'],
+            ]);
         }
 
-        $filename = $image->hashName();
-        $image->move($destination, $filename);
-
-        return '/uploads/variants/' . $filename;
+        return '/storage/' . ltrim(str_replace('\\', '/', $storedPath), '/');
     }
 
     private function syncProductVariantPrices(Product $productModel, float $price): void

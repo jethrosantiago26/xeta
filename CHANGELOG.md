@@ -2,6 +2,9 @@
 
 ## [Unreleased](https://github.com/laravel/laravel/compare/v12.12.1...12.x)
 
+* Improve admin marketing campaign delivery diagnostics, including per-recipient failure reasons and clearer opt-in counts.
+* Update the production marketing sender address to `no-reply@xeta.com` for verified-domain delivery.
+
 ## [v12.12.1](https://github.com/laravel/laravel/compare/v12.12.0...v12.12.1) - 2026-03-10
 
 * [12.x] Makes imports consistent by [@nunomaduro](https://github.com/nunomaduro) in https://github.com/laravel/laravel/pull/6760

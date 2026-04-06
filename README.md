@@ -88,33 +88,6 @@ Xeta/
 - Variant and inventory-oriented product forms
 - Light and dark theme support
 
-## Architecture Flowchart
-
-```mermaid
-flowchart LR
-		A[Customer/Admin Browser] --> B[React + Vite Frontend]
-		B --> C[Clerk Authentication]
-		C --> B
-		B --> D[Laravel API /api/v1]
-		D --> E[Clerk JWT Verification Middleware]
-		E --> F[Controllers + Services]
-		F --> G[(MySQL)]
-
-		subgraph Customer Flow
-			B --> H[Products / Cart / Checkout]
-			H --> D
-			D --> I[Orders + Profile APIs]
-			I --> G
-		end
-
-		subgraph Admin Flow
-			B --> J[Admin Dashboard / Product Control]
-			J --> D
-			D --> K[Admin Middleware + Admin Controllers]
-			K --> G
-		end
-```
-
 ## Shopping Flow
 
 ```mermaid

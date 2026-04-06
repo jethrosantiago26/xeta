@@ -115,6 +115,35 @@ flowchart LR
 		end
 ```
 
+## Shopping Flow
+
+```mermaid
+flowchart TD
+    A([Start]) --> B{Registered?}
+    B -- No --> C[Register]
+    B -- Yes --> D[Login]
+    C --> D
+    D --> E{Shop?}
+    E -- Yes --> F[View / Search]
+    E -- No --> G[View Item]
+    F --> H[Add to Cart]
+    H --> I[Display Cart]
+    G --> J{Proceed?}
+    J --> K[Process]
+    I --> L{Change Cart?}
+    L -- Yes --> M[Update Qty]
+    L -- No --> N[Checkout]
+    M --> O[Shopping Cart]
+    N --> O
+    O --> P[Payment Method]
+    P --> Q{Approved?}
+    Q -- No --> R[Back to Cart]
+    Q -- Yes --> S[Fill Shipping Info]
+    S --> T[Shipping & Billing]
+    T --> U[Order Confirmation]
+    U --> V([End])
+```
+
 ## Setup Guide
 
 ### 1) Prerequisites

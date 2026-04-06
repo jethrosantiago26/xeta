@@ -30,3 +30,4 @@ lighthouse-*.json
 localhost_*.json
 lighthouse-reports/
 frontend/lh-preview-*.json
+DESIGN.md

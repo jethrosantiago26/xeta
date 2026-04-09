@@ -264,7 +264,7 @@ function CustomerLayout({ isDark, toggleTheme }) {
   }
 
   return (
-    <div className="page-shell">
+    <div className="page-shell customer-shell">
       <header className={`site-header site-header-landing${isLandingPage ? ' site-header-home' : ''}`}>
         <div className="header-row customer-header-row">
           <NavLink className="brand" to="/">
@@ -407,6 +407,47 @@ function CustomerLayout({ isDark, toggleTheme }) {
         <CustomerBreadcrumbs pathname={location.pathname} />
         <Outlet />
       </main>
+
+      <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+        <NavLink className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`} to="/products">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4.5 6.8h15M6.2 6.8l1 11.4a1.2 1.2 0 0 0 1.2 1.1h7.2a1.2 1.2 0 0 0 1.2-1.1l1-11.4M9.2 6.8V5.6a2.8 2.8 0 0 1 5.6 0v1.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Shop</span>
+        </NavLink>
+
+        <NavLink className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`} to="/wishlist">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Wishlist</span>
+        </NavLink>
+
+        <NavLink className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`} to="/cart">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 5h2l2.2 9.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L20 8H7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="10" cy="19" r="1.5" fill="currentColor" />
+            <circle cx="17" cy="19" r="1.5" fill="currentColor" />
+          </svg>
+          <span>Cart</span>
+        </NavLink>
+
+        <NavLink className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`} to="/orders">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M6.2 4.5h11.6a1.2 1.2 0 0 1 1.2 1.2v12.6a1.2 1.2 0 0 1-1.2 1.2H6.2A1.2 1.2 0 0 1 5 18.3V5.7a1.2 1.2 0 0 1 1.2-1.2Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>Orders</span>
+        </NavLink>
+
+        <NavLink className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`} to="/account">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.09a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09A1.65 1.65 0 0 0 20.91 10H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.75" />
+          </svg>
+          <span>Account</span>
+        </NavLink>
+      </nav>
 
       <footer className="site-footer">
         <div className="footer-row">

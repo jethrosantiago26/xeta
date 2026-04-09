@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProductResource;
 use App\Models\WishlistItem;
 use App\Models\ProductVariant;
 use Illuminate\Http\JsonResponse;
@@ -17,29 +18,37 @@ class WishlistController extends Controller
     {
         $items = $request->user()
             ->wishlistItems()
-            ->with(['variant.product.images' => fn ($q) => $q->where('is_primary', true)])
+            ->with([
+                'variant.product' => function ($query) {
+                    $query->active()
+                        ->with([
+                            'category',
+                            'variants' => fn ($variantQuery) => $variantQuery->active()->where('condition', 'new'),
+                            'images',
+                        ])
+                        ->withCount([
+                            'reviews as review_count' => fn ($reviewQuery) => $reviewQuery->approved(),
+                        ])
+                        ->withAvg([
+                            'reviews as average_rating' => fn ($reviewQuery) => $reviewQuery->approved(),
+                        ], 'rating')
+                        ->withMin([
+                            'variants as lowest_price' => fn ($variantQuery) => $variantQuery->active()->where('condition', 'new'),
+                        ], 'price');
+                },
+            ])
+            ->latest()
             ->get()
-            ->map(function ($item) {
-                $variant = $item->variant;
-                $product = $variant->product;
+            ->filter(fn (WishlistItem $item) => $item->variant?->product !== null)
+            ->unique(fn (WishlistItem $item) => $item->variant->product->id)
+            ->values()
+            ->map(function (WishlistItem $item) use ($request) {
                 return [
                     'id' => $item->id,
-                    'variant' => [
-                        'id' => $variant->id,
-                        'name' => $variant->name,
-                        'price' => (float) $variant->price,
-                        'compare_at_price' => $variant->compare_at_price ? (float) $variant->compare_at_price : null,
-                        'in_stock' => $variant->isInStock(),
-                        'condition' => $variant->condition,
-                    ],
-                    'product' => [
-                        'id' => $product->id,
-                        'name' => $product->name,
-                        'slug' => $product->slug,
-                        'image' => $product->images->firstWhere('is_primary', true)?->url
-                            ?? $product->images->first()?->url,
-                    ],
-                    'added_at' => $item->created_at,
+                    'variant_id' => $item->variant_id,
+                    // Resolve the resource payload so nested MissingValue placeholders are stripped.
+                    'product' => ProductResource::make($item->variant->product)->resolve($request),
+                    'added_at' => $item->created_at?->toISOString(),
                 ];
             });
 
@@ -56,22 +65,41 @@ class WishlistController extends Controller
         ]);
 
         $user = $request->user();
-        $variantId = $request->input('variant_id');
+        $variantId = (int) $request->input('variant_id');
 
-        $existing = WishlistItem::where('user_id', $user->id)
-            ->where('variant_id', $variantId)
+        $variant = ProductVariant::query()
+            ->whereKey($variantId)
+            ->where('is_active', true)
+            ->where('condition', 'new')
+            ->whereHas('product', fn ($query) => $query->active())
+            ->first();
+
+        if (!$variant) {
+            return response()->json(['message' => 'Selected variant is not available'], 422);
+        }
+
+        // Wishlist UI is product-level. Keep only one saved entry per product for each user.
+        $existing = WishlistItem::query()
+            ->where('user_id', $user->id)
+            ->whereHas('variant', fn ($query) => $query->where('product_id', $variant->product_id))
             ->first();
 
         if ($existing) {
-            return response()->json(['message' => 'Already in wishlist'], 409);
+            return response()->json([
+                'message' => 'Already in wishlist',
+                'item_id' => $existing->id,
+            ]);
         }
 
-        WishlistItem::create([
+        $item = WishlistItem::create([
             'user_id' => $user->id,
             'variant_id' => $variantId,
         ]);
 
-        return response()->json(['message' => 'Added to wishlist'], 201);
+        return response()->json([
+            'message' => 'Added to wishlist',
+            'item_id' => $item->id,
+        ], 201);
     }
 
     /**
@@ -79,9 +107,23 @@ class WishlistController extends Controller
      */
     public function destroy(Request $request, int $wishlistItem): JsonResponse
     {
-        WishlistItem::where('user_id', $request->user()->id)
-            ->findOrFail($wishlistItem)
-            ->delete();
+        $userId = $request->user()->id;
+
+        $item = WishlistItem::query()
+            ->where('user_id', $userId)
+            ->with('variant')
+            ->findOrFail($wishlistItem);
+
+        $productId = $item->variant?->product_id;
+
+        if ($productId === null) {
+            $item->delete();
+        } else {
+            WishlistItem::query()
+                ->where('user_id', $userId)
+                ->whereHas('variant', fn ($query) => $query->where('product_id', $productId))
+                ->delete();
+        }
 
         return response()->json(['message' => 'Removed from wishlist']);
     }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import ProductCard from '../components/ProductCard.jsx'
 import PageHeader from '../components/PageHeader.jsx'
@@ -14,7 +15,6 @@ const VIEW_OPTIONS = [
   { value: 'grid2', columns: 2, iconCells: 4, kind: 'grid', label: 'Grid 2' },
   { value: 'grid3', columns: 3, iconCells: 6, kind: 'grid', label: 'Grid 3' },
   { value: 'grid4', columns: 4, iconCells: 8, kind: 'grid', label: 'Grid 4' },
-  { value: 'grid5', columns: 5, iconCells: 10, kind: 'grid', label: 'Grid 5' },
 ]
 
 function parseCategoryFilters(params) {
@@ -79,6 +79,7 @@ function ProductsPage() {
   const [priceBounds, setPriceBounds] = useState(DEFAULT_PRICE_BOUNDS)
   const [boundsReady, setBoundsReady] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false)
 
   // Local state for the search input — decoupled from the URL so typing
   // doesn't fire a request on every keystroke.
@@ -98,7 +99,23 @@ function ProductsPage() {
   }
 
   const perPage = Math.max(6, Number(searchParams.get('per_page') || 12) || 12)
-  const viewMode = searchParams.get('view') ?? 'list'
+  const viewModeParam = searchParams.get('view') ?? 'grid2'
+  const viewMode = viewModeParam === 'grid5' ? 'grid4' : viewModeParam
+  const [isMobileGridView, setIsMobileGridView] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false
+    }
+
+    return window.matchMedia('(max-width: 900px)').matches
+  })
+
+  const effectiveViewMode = isMobileGridView && (viewMode === 'grid3' || viewMode === 'grid4')
+    ? 'grid2'
+    : viewMode
+
+  const availableViewOptions = isMobileGridView
+    ? VIEW_OPTIONS.filter((option) => option.value !== 'grid3' && option.value !== 'grid4')
+    : VIEW_OPTIONS
 
   const requestFilters = useMemo(() => {
     return {
@@ -367,13 +384,31 @@ function ProductsPage() {
   function setViewMode(nextMode) {
     const next = new URLSearchParams(searchParams)
 
-    if (!nextMode || nextMode === 'list') {
+    if (!nextMode || nextMode === 'grid2') {
       next.delete('view')
     } else {
       next.set('view', nextMode)
     }
 
     setSearchParams(next)
+  }
+
+  function openMobileFilters() {
+    setIsMobileFilterOpen(true)
+  }
+
+  function closeMobileFilters() {
+    setIsMobileFilterOpen(false)
+  }
+
+  function clearAndCloseMobileFilters() {
+    clearFilters()
+    setIsMobileFilterOpen(false)
+  }
+
+  function applyAndCloseMobileFilters() {
+    applyPriceFilters()
+    setIsMobileFilterOpen(false)
   }
 
   const productsWithStockState = useMemo(() => {
@@ -411,7 +446,7 @@ function ProductsPage() {
   }, [productsWithStockState, filters.stock_view])
 
   const selectedPerPage = String(perPage)
-  const selectedView = VIEW_OPTIONS.find((option) => option.value === viewMode) ?? VIEW_OPTIONS[0]
+  const selectedView = VIEW_OPTIONS.find((option) => option.value === effectiveViewMode) ?? VIEW_OPTIONS[1]
   const isRowView = selectedView.value === 'list'
   const productListClassName = isRowView
     ? 'catalog-product-list'
@@ -419,8 +454,164 @@ function ProductsPage() {
   const toolbarSummaryText = meta?.total
     ? `Showing ${displayedProducts.length} of ${meta.total} items`
     : `Showing ${displayedProducts.length} item${displayedProducts.length === 1 ? '' : 's'}`
+  const activeFilterCount = (
+    (filters.search ? 1 : 0)
+    + (filters.min_price ? 1 : 0)
+    + (filters.max_price ? 1 : 0)
+    + (filters.in_stock === '1' ? 1 : 0)
+    + (filters.stock_view === 'out' ? 1 : 0)
+    + selectedCategorySlugs.length
+  )
 
   const hasValidBounds = priceBounds.max >= priceBounds.min && (priceBounds.max > 0 || priceBounds.min > 0)
+
+  useEffect(() => {
+    if (!isMobileFilterOpen) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setIsMobileFilterOpen(false)
+      }
+    }
+
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isMobileFilterOpen])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 900px)')
+
+    function handleViewportChange(event) {
+      setIsMobileGridView(event.matches)
+    }
+
+    setIsMobileGridView(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleViewportChange)
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleViewportChange)
+    }
+  }, [])
+
+  function renderFilters({ mobile = false } = {}) {
+    return (
+      <>
+        <label className="catalog-filter-field">
+          <span className="catalog-filter-label">Search</span>
+          <input
+            className="input"
+            placeholder="Search products"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+          />
+        </label>
+
+        <div className="catalog-filter-group">
+          <h3>Availability</h3>
+          <label className="catalog-checkbox-row">
+            <input
+              type="checkbox"
+              checked={filters.in_stock === '1'}
+              onChange={(event) => setInStockFilter(event.target.checked)}
+            />
+            <span>In stock ({stockCounts.inStock})</span>
+          </label>
+          <label className="catalog-checkbox-row">
+            <input
+              type="checkbox"
+              checked={filters.stock_view === 'out'}
+              onChange={(event) => setOutOfStockView(event.target.checked)}
+            />
+            <span>Out of stock ({stockCounts.outOfStock})</span>
+          </label>
+        </div>
+
+        <div className="catalog-filter-group">
+          <h3>Price</h3>
+          <PriceSlider
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            setMinPrice={setMinPrice}
+            setMaxPrice={setMaxPrice}
+            boundsMin={priceBounds.min}
+            boundsMax={priceBounds.max}
+            step={50}
+          />
+          <div className="catalog-price-inputs">
+            <label className="catalog-filter-field">
+              <span className="catalog-filter-label">Min</span>
+              <input
+                className="input"
+                type="number"
+                min={priceBounds.min}
+                max={priceBounds.max}
+                step={50}
+                value={minPrice}
+                onChange={(event) => setMinPrice(event.target.value)}
+              />
+            </label>
+            <label className="catalog-filter-field">
+              <span className="catalog-filter-label">Max</span>
+              <input
+                className="input"
+                type="number"
+                min={priceBounds.min}
+                max={priceBounds.max}
+                step={50}
+                value={maxPrice}
+                onChange={(event) => setMaxPrice(event.target.value)}
+              />
+            </label>
+          </div>
+          <p className="products-price-caption">
+            {hasValidBounds
+              ? `Price limits: ${formatMoney(priceBounds.min)} to ${formatMoney(priceBounds.max)}`
+              : 'Price limits update as products load.'}
+          </p>
+          {!mobile ? (
+            <button type="button" className="button button-primary catalog-apply-button" onClick={applyPriceFilters}>
+              Apply
+            </button>
+          ) : null}
+        </div>
+
+        <div className="catalog-filter-group">
+          <h3>Product type</h3>
+          <div className="catalog-checkbox-list">
+            {categories.map((category) => {
+              const isChecked = selectedCategorySlugs.includes(category.slug)
+
+              return (
+                <label key={category.id} className="catalog-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(event) => {
+                      toggleCategoryFilter(category.slug, event.target.checked)
+                    }}
+                  />
+                  <span>{category.name} ({category.products_count ?? 0})</span>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <div className="page-grid">
@@ -431,7 +622,7 @@ function ProductsPage() {
       />
 
       <div className="catalog-layout">
-        <aside className="catalog-sidebar">
+        <aside className="catalog-sidebar catalog-sidebar-desktop">
           <section className="filter-panel catalog-sidebar-panel">
             <div className="catalog-sidebar-head">
               <h2>Filters</h2>
@@ -444,104 +635,7 @@ function ProductsPage() {
               </button>
             </div>
 
-            <label className="catalog-filter-field">
-              <span className="catalog-filter-label">Search</span>
-              <input
-                className="input"
-                placeholder="Search products"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-              />
-            </label>
-
-            <div className="catalog-filter-group">
-              <h3>Availability</h3>
-              <label className="catalog-checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={filters.in_stock === '1'}
-                  onChange={(event) => setInStockFilter(event.target.checked)}
-                />
-                <span>In stock ({stockCounts.inStock})</span>
-              </label>
-              <label className="catalog-checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={filters.stock_view === 'out'}
-                  onChange={(event) => setOutOfStockView(event.target.checked)}
-                />
-                <span>Out of stock ({stockCounts.outOfStock})</span>
-              </label>
-            </div>
-
-            <div className="catalog-filter-group">
-              <h3>Price</h3>
-              <PriceSlider
-                minPrice={minPrice}
-                maxPrice={maxPrice}
-                setMinPrice={setMinPrice}
-                setMaxPrice={setMaxPrice}
-                boundsMin={priceBounds.min}
-                boundsMax={priceBounds.max}
-                step={50}
-              />
-              <div className="catalog-price-inputs">
-                <label className="catalog-filter-field">
-                  <span className="catalog-filter-label">Min</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={priceBounds.min}
-                    max={priceBounds.max}
-                    step={50}
-                    value={minPrice}
-                    onChange={(event) => setMinPrice(event.target.value)}
-                  />
-                </label>
-                <label className="catalog-filter-field">
-                  <span className="catalog-filter-label">Max</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min={priceBounds.min}
-                    max={priceBounds.max}
-                    step={50}
-                    value={maxPrice}
-                    onChange={(event) => setMaxPrice(event.target.value)}
-                  />
-                </label>
-              </div>
-              <p className="products-price-caption">
-                {hasValidBounds
-                  ? `Price limits: ${formatMoney(priceBounds.min)} to ${formatMoney(priceBounds.max)}`
-                  : 'Price limits update as products load.'}
-              </p>
-              <button type="button" className="button button-primary catalog-apply-button" onClick={applyPriceFilters}>
-                Apply
-              </button>
-            </div>
-
-            <div className="catalog-filter-group">
-              <h3>Product type</h3>
-              <div className="catalog-checkbox-list">
-                {categories.map((category) => {
-                  const isChecked = selectedCategorySlugs.includes(category.slug)
-
-                  return (
-                    <label key={category.id} className="catalog-checkbox-row">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(event) => {
-                          toggleCategoryFilter(category.slug, event.target.checked)
-                        }}
-                      />
-                      <span>{category.name} ({category.products_count ?? 0})</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
+            {renderFilters()}
           </section>
         </aside>
 
@@ -552,10 +646,35 @@ function ProductsPage() {
             </p>
 
             <div className="catalog-toolbar-controls">
+              <div className="catalog-mobile-controls">
+                <button
+                  type="button"
+                  className="button button-secondary catalog-mobile-filter-button"
+                  onClick={openMobileFilters}
+                >
+                  Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </button>
+
+                <label className="catalog-mobile-sort-field">
+                  <span className="catalog-toolbar-field-label">Sort by</span>
+                  <select
+                    className="select"
+                    value={filters.sort}
+                    onChange={(event) => updateFilter('sort', event.target.value)}
+                  >
+                    <option value="latest">Newest</option>
+                    <option value="price_asc">Price: low to high</option>
+                    <option value="price_desc">Price: high to low</option>
+                    <option value="name_asc">Name: A to Z</option>
+                    <option value="name_desc">Name: Z to A</option>
+                  </select>
+                </label>
+              </div>
+
               <div className="catalog-view-picker" role="group" aria-label="View options">
                 <span className="catalog-view-label">View as</span>
                 <div className="catalog-view-options">
-                  {VIEW_OPTIONS.map((option) => {
+                  {availableViewOptions.map((option) => {
                     const isActive = option.value === selectedView.value
 
                     return (
@@ -581,7 +700,7 @@ function ProductsPage() {
                 </div>
               </div>
 
-              <label className="catalog-toolbar-field">
+              <label className="catalog-toolbar-field catalog-toolbar-field--per-page">
                 <span className="catalog-toolbar-field-label">Items per page</span>
                 <select
                   className="select"
@@ -594,7 +713,7 @@ function ProductsPage() {
                 </select>
               </label>
 
-              <label className="catalog-toolbar-field">
+              <label className="catalog-toolbar-field catalog-toolbar-field--sort">
                 <span className="catalog-toolbar-field-label">Sort by</span>
                 <select
                   className="select"
@@ -621,8 +740,8 @@ function ProductsPage() {
                 prioritizeImage={index < 2}
                 imageFetchPriority={index === 0 ? 'high' : 'auto'}
                 layout={isRowView ? 'row' : 'card'}
-                showDescription={selectedView.columns <= 3}
-                uniformCardDesign={selectedView.columns >= 4}
+                showDescription={selectedView.columns <= 2 && !isMobileGridView}
+                uniformCardDesign={selectedView.columns >= 3}
               />
             ))}
           </section>
@@ -643,6 +762,43 @@ function ProductsPage() {
           ) : null}
         </main>
       </div>
+
+      {isMobileFilterOpen && typeof document !== 'undefined'
+        ? createPortal(
+          <div
+            className="catalog-mobile-filter-backdrop open"
+            onClick={closeMobileFilters}
+            aria-hidden="false"
+          >
+            <section
+              className="filter-panel catalog-mobile-filter-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Filter products"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="catalog-mobile-filter-head">
+                <h2>Filters</h2>
+                <button type="button" className="button button-secondary" onClick={closeMobileFilters}>Close</button>
+              </header>
+
+              <div className="catalog-mobile-filter-body">
+                {renderFilters({ mobile: true })}
+              </div>
+
+              <footer className="catalog-mobile-filter-footer">
+                <button type="button" className="button button-secondary" onClick={clearAndCloseMobileFilters}>
+                  Clear
+                </button>
+                <button type="button" className="button button-primary" onClick={applyAndCloseMobileFilters}>
+                  Show results
+                </button>
+              </footer>
+            </section>
+          </div>,
+          document.body,
+        )
+        : null}
     </div>
   )
 }

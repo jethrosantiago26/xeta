@@ -1,22 +1,21 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { addWishlistItem, getWishlist, removeWishlistItem } from '../lib/api.js'
 import { useSession } from './SessionContext.jsx'
 
 const WishlistContext = createContext(null)
-const WISHLIST_STORAGE_PREFIX = 'xeta:wishlist:v1:'
+const REFRESH_INTERVAL_MS = 10000
 
-function getStorageKey(profile) {
-  if (!profile) {
-    return null
+function unwrapResource(resource) {
+  if (!resource || typeof resource !== 'object') {
+    return resource
   }
 
-  const identity = profile.clerk_id || profile.id
-
-  if (!identity) {
-    return null
+  if (resource.data && typeof resource.data === 'object') {
+    return resource.data
   }
 
-  return `${WISHLIST_STORAGE_PREFIX}${identity}`
+  return resource
 }
 
 function normalizeVariant(variant) {
@@ -24,11 +23,13 @@ function normalizeVariant(variant) {
     return null
   }
 
+  const variantId = Number(variant.id)
+
   return {
-    id: variant.id,
+    id: Number.isFinite(variantId) ? variantId : variant.id,
     name: variant.name,
     price: variant.price,
-    stock_quantity: variant.stock_quantity,
+    stock_quantity: Number(variant.stock_quantity ?? 0),
     image_url: variant.image_url,
     attributes: variant.attributes && typeof variant.attributes === 'object'
       ? variant.attributes
@@ -37,23 +38,27 @@ function normalizeVariant(variant) {
 }
 
 function normalizeCategory(category) {
-  if (!category || typeof category !== 'object') {
+  const normalized = unwrapResource(category)
+
+  if (!normalized || typeof normalized !== 'object') {
     return null
   }
 
   return {
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
+    id: normalized.id,
+    name: normalized.name,
+    slug: normalized.slug,
   }
 }
 
 function normalizeImages(images) {
-  if (!Array.isArray(images)) {
+  const imageList = unwrapResource(images)
+
+  if (!Array.isArray(imageList)) {
     return []
   }
 
-  return images
+  return imageList
     .map((image) => {
       if (typeof image === 'string') {
         return { url: image }
@@ -68,79 +73,102 @@ function normalizeImages(images) {
     .filter((image) => image && typeof image.url === 'string' && image.url.trim() !== '')
 }
 
+function normalizeVariants(variants) {
+  const variantList = unwrapResource(variants)
+
+  if (!Array.isArray(variantList)) {
+    return []
+  }
+
+  return variantList
+    .map(normalizeVariant)
+    .filter(Boolean)
+}
+
 function normalizeProduct(product) {
-  if (!product || typeof product !== 'object') {
+  const normalized = unwrapResource(product)
+
+  if (!normalized || typeof normalized !== 'object') {
     return null
   }
 
-  const slug = typeof product.slug === 'string' ? product.slug.trim() : ''
+  const slug = typeof normalized.slug === 'string' ? normalized.slug.trim() : ''
 
   if (!slug) {
     return null
   }
 
-  const normalizedVariants = Array.isArray(product.variants)
-    ? product.variants
-      .map(normalizeVariant)
-      .filter(Boolean)
-    : []
+  const normalizedVariants = normalizeVariants(normalized.variants)
+  const normalizedImages = normalizeImages(normalized.images)
+  const primaryImage = normalized.primary_image || normalized.image_url || normalized.image
+  const reviewCount = Number(normalized.review_count ?? 0)
+  const averageRating = Number(normalized.average_rating ?? 0)
 
   return {
-    id: product.id,
+    id: normalized.id,
     slug,
-    name: product.name,
-    description: product.description,
-    category: normalizeCategory(product.category),
-    lowest_price: product.lowest_price,
-    average_rating: product.average_rating,
-    review_count: product.review_count,
-    primary_image: product.primary_image,
-    image_url: product.image_url,
-    images: normalizeImages(product.images),
+    name: normalized.name,
+    description: normalized.description,
+    category: normalizeCategory(normalized.category),
+    lowest_price: normalized.lowest_price,
+    average_rating: Number.isFinite(averageRating) ? averageRating : 0,
+    review_count: Number.isFinite(reviewCount) ? reviewCount : 0,
+    primary_image: primaryImage,
+    image_url: primaryImage,
+    images: normalizedImages,
     variants: normalizedVariants,
   }
 }
 
-function readWishlist(storageKey) {
-  if (!storageKey) {
+function normalizeWishlistEntries(payload) {
+  const itemList = payload?.items?.data ?? payload?.items ?? []
+
+  if (!Array.isArray(itemList)) {
     return []
   }
 
-  try {
-    const raw = localStorage.getItem(storageKey)
+  const seenBySlug = new Set()
 
-    if (!raw) {
-      return []
-    }
+  return itemList
+    .map((item, index) => {
+      const product = normalizeProduct(item?.product)
 
-    const parsed = JSON.parse(raw)
+      if (!product || seenBySlug.has(product.slug)) {
+        return null
+      }
 
-    if (!Array.isArray(parsed)) {
-      return []
-    }
+      seenBySlug.add(product.slug)
 
-    return parsed
-      .map((entry, index) => {
-        const maybeProduct = entry?.product ?? entry
-        const product = normalizeProduct(maybeProduct)
+      const entryId = Number(item?.id)
+      const variantId = Number(item?.variant_id)
+      const savedAt = typeof item?.added_at === 'string' && item.added_at.trim() !== ''
+        ? item.added_at
+        : new Date(Date.now() - index).toISOString()
 
-        if (!product) {
-          return null
-        }
+      return {
+        id: Number.isFinite(entryId) ? entryId : null,
+        variantId: Number.isFinite(variantId) ? variantId : null,
+        savedAt,
+        product,
+      }
+    })
+    .filter(Boolean)
+}
 
-        const savedAt = typeof entry?.savedAt === 'string' && entry.savedAt.trim() !== ''
-          ? entry.savedAt
-          : new Date(Date.now() - index).toISOString()
+function resolveVariantId(product, preferredVariantId = null) {
+  const candidateId = Number(preferredVariantId)
 
-        return {
-          savedAt,
-          product,
-        }
-      })
-      .filter(Boolean)
-  } catch {
-    return []
+  if (Number.isFinite(candidateId) && product.variants.some((variant) => Number(variant.id) === candidateId)) {
+    return candidateId
   }
+
+  const firstVariantId = Number(product.variants[0]?.id)
+
+  if (Number.isFinite(firstVariantId)) {
+    return firstVariantId
+  }
+
+  return null
 }
 
 function resolveSlug(input) {
@@ -156,61 +184,65 @@ function resolveSlug(input) {
 }
 
 export function WishlistProvider({ children }) {
-  const { profile, isSignedIn, loading } = useSession()
+  const { profile, isLoaded, isSignedIn, loading } = useSession()
   const canUseWishlist = isSignedIn && !loading && profile?.role !== 'admin'
-  const storageKey = useMemo(() => {
+  const [entries, setEntries] = useState([])
+  const [wishlistLoading, setWishlistLoading] = useState(false)
+
+  const refreshWishlist = useCallback(async ({ background = false } = {}) => {
     if (!canUseWishlist) {
-      return null
-    }
-
-    return getStorageKey(profile)
-  }, [canUseWishlist, profile])
-
-  const [entriesByKey, setEntriesByKey] = useState({})
-
-  const entries = useMemo(() => {
-    if (!storageKey) {
-      return []
-    }
-
-    if (Object.prototype.hasOwnProperty.call(entriesByKey, storageKey)) {
-      return entriesByKey[storageKey]
-    }
-
-    return readWishlist(storageKey)
-  }, [entriesByKey, storageKey])
-
-  function setCurrentEntries(updater) {
-    if (!storageKey) {
+      setEntries([])
+      setWishlistLoading(false)
       return
     }
 
-    setEntriesByKey((current) => {
-      const previousEntries = Object.prototype.hasOwnProperty.call(current, storageKey)
-        ? current[storageKey]
-        : readWishlist(storageKey)
-      const nextEntries = typeof updater === 'function'
-        ? updater(previousEntries)
-        : updater
-
-      return {
-        ...current,
-        [storageKey]: nextEntries,
-      }
-    })
-  }
-
-  useEffect(() => {
-    if (!storageKey) {
-      return
+    if (!background) {
+      setWishlistLoading(true)
     }
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(entries))
+      const response = await getWishlist()
+      setEntries(normalizeWishlistEntries(response.data))
     } catch {
-      // Ignore localStorage write failures.
+      if (!background) {
+        setEntries([])
+      }
+    } finally {
+      if (!background) {
+        setWishlistLoading(false)
+      }
     }
-  }, [entries, storageKey])
+  }, [canUseWishlist])
+
+  useEffect(() => {
+    if (!isLoaded || loading) {
+      return
+    }
+
+    refreshWishlist()
+  }, [isLoaded, loading, refreshWishlist])
+
+  useEffect(() => {
+    if (!isLoaded || loading || !canUseWishlist) {
+      return
+    }
+
+    function refreshVisibleWishlist() {
+      if (document.hidden) {
+        return
+      }
+
+      refreshWishlist({ background: true })
+    }
+
+    const intervalId = window.setInterval(refreshVisibleWishlist, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refreshVisibleWishlist)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshVisibleWishlist)
+    }
+  }, [canUseWishlist, isLoaded, loading, refreshWishlist])
 
   const items = useMemo(() => {
     if (!canUseWishlist) {
@@ -223,9 +255,136 @@ export function WishlistProvider({ children }) {
     }))
   }, [canUseWishlist, entries])
 
+  const addItem = useCallback(async (product, preferredVariantId = null) => {
+    if (!canUseWishlist) {
+      return { ok: false, reason: 'auth', saved: false }
+    }
+
+    const normalizedProduct = normalizeProduct(product)
+
+    if (!normalizedProduct) {
+      return { ok: false, reason: 'invalid', saved: false }
+    }
+
+    if (entries.some((entry) => entry.product.slug === normalizedProduct.slug)) {
+      return { ok: true, reason: null, saved: true }
+    }
+
+    const variantId = resolveVariantId(normalizedProduct, preferredVariantId)
+
+    if (!variantId) {
+      return { ok: false, reason: 'invalid', saved: false }
+    }
+
+    try {
+      const response = await addWishlistItem({ variant_id: variantId })
+      const itemId = Number(response?.data?.item_id)
+
+      setEntries((current) => [{
+        id: Number.isFinite(itemId) ? itemId : null,
+        variantId,
+        savedAt: new Date().toISOString(),
+        product: normalizedProduct,
+      }, ...current.filter((entry) => entry.product.slug !== normalizedProduct.slug)])
+
+      // Pull canonical product details after optimistic local add.
+      refreshWishlist({ background: true })
+
+      return { ok: true, reason: null, saved: true }
+    } catch (error) {
+      if (error?.response?.status === 409) {
+        refreshWishlist({ background: true })
+        return { ok: true, reason: null, saved: true }
+      }
+
+      return { ok: false, reason: 'request', saved: false }
+    }
+  }, [canUseWishlist, entries, refreshWishlist])
+
+  const removeItem = useCallback(async (input) => {
+    if (!canUseWishlist) {
+      return { ok: false, reason: 'auth' }
+    }
+
+    const slug = resolveSlug(input)
+
+    if (!slug) {
+      return { ok: false, reason: 'invalid' }
+    }
+
+    const existingEntry = entries.find((entry) => entry.product.slug === slug)
+
+    if (!existingEntry) {
+      return { ok: true, reason: null }
+    }
+
+    if (!existingEntry.id) {
+      setEntries((current) => current.filter((entry) => entry.product.slug !== slug))
+      return { ok: true, reason: null }
+    }
+
+    try {
+      await removeWishlistItem(existingEntry.id)
+      setEntries((current) => current.filter((entry) => entry.product.slug !== slug))
+      refreshWishlist({ background: true })
+      return { ok: true, reason: null }
+    } catch {
+      return { ok: false, reason: 'request' }
+    }
+  }, [canUseWishlist, entries, refreshWishlist])
+
+  const toggleItem = useCallback(async (product, preferredVariantId = null) => {
+    if (!canUseWishlist) {
+      return { ok: false, reason: 'auth', saved: false }
+    }
+
+    const normalizedProduct = normalizeProduct(product)
+
+    if (!normalizedProduct) {
+      return { ok: false, reason: 'invalid', saved: false }
+    }
+
+    const exists = entries.some((entry) => entry.product.slug === normalizedProduct.slug)
+
+    if (exists) {
+      const result = await removeItem(normalizedProduct.slug)
+      return {
+        ok: result.ok,
+        reason: result.reason,
+        saved: false,
+      }
+    }
+
+    return addItem(normalizedProduct, preferredVariantId)
+  }, [addItem, canUseWishlist, entries, removeItem])
+
+  const clearWishlist = useCallback(async () => {
+    if (!canUseWishlist) {
+      return { ok: false, reason: 'auth' }
+    }
+
+    const entriesWithIds = entries.filter((entry) => entry.id)
+
+    if (entriesWithIds.length === 0) {
+      setEntries([])
+      return { ok: true, reason: null }
+    }
+
+    try {
+      await Promise.all(entriesWithIds.map((entry) => removeWishlistItem(entry.id)))
+      setEntries([])
+      refreshWishlist({ background: true })
+      return { ok: true, reason: null }
+    } catch {
+      await refreshWishlist()
+      return { ok: false, reason: 'request' }
+    }
+  }, [canUseWishlist, entries, refreshWishlist])
+
   const value = {
     items,
     count: items.length,
+    loading: wishlistLoading,
     canUseWishlist,
     isWishlisted: (input) => {
       const slug = resolveSlug(input)
@@ -236,78 +395,11 @@ export function WishlistProvider({ children }) {
 
       return entries.some((entry) => entry.product.slug === slug)
     },
-    addItem: (product) => {
-      if (!canUseWishlist) {
-        return { ok: false, reason: 'auth', saved: false }
-      }
-
-      const normalizedProduct = normalizeProduct(product)
-
-      if (!normalizedProduct) {
-        return { ok: false, reason: 'invalid', saved: false }
-      }
-
-      const exists = entries.some((entry) => entry.product.slug === normalizedProduct.slug)
-
-      if (exists) {
-        return { ok: true, reason: null, saved: true }
-      }
-
-      setCurrentEntries((current) => [{
-        savedAt: new Date().toISOString(),
-        product: normalizedProduct,
-      }, ...current])
-
-      return { ok: true, reason: null, saved: true }
-    },
-    removeItem: (input) => {
-      if (!canUseWishlist) {
-        return { ok: false, reason: 'auth' }
-      }
-
-      const slug = resolveSlug(input)
-
-      if (!slug) {
-        return { ok: false, reason: 'invalid' }
-      }
-
-      setCurrentEntries((current) => current.filter((entry) => entry.product.slug !== slug))
-
-      return { ok: true, reason: null }
-    },
-    toggleItem: (product) => {
-      if (!canUseWishlist) {
-        return { ok: false, reason: 'auth', saved: false }
-      }
-
-      const normalizedProduct = normalizeProduct(product)
-
-      if (!normalizedProduct) {
-        return { ok: false, reason: 'invalid', saved: false }
-      }
-
-      const exists = entries.some((entry) => entry.product.slug === normalizedProduct.slug)
-
-      if (exists) {
-        setCurrentEntries((current) => current.filter((entry) => entry.product.slug !== normalizedProduct.slug))
-        return { ok: true, reason: null, saved: false }
-      }
-
-      setCurrentEntries((current) => [{
-        savedAt: new Date().toISOString(),
-        product: normalizedProduct,
-      }, ...current])
-
-      return { ok: true, reason: null, saved: true }
-    },
-    clearWishlist: () => {
-      if (!canUseWishlist) {
-        return { ok: false, reason: 'auth' }
-      }
-
-      setCurrentEntries([])
-      return { ok: true, reason: null }
-    },
+    addItem,
+    removeItem,
+    toggleItem,
+    clearWishlist,
+    refreshWishlist,
   }
 
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>

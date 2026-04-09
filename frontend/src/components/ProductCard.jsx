@@ -41,6 +41,7 @@ function ProductCard({
   const [showQuickView, setShowQuickView] = useState(false)
   const [quickViewQuantity, setQuickViewQuantity] = useState(1)
   const [quickViewBusy, setQuickViewBusy] = useState(false)
+  const [wishlistBusy, setWishlistBusy] = useState(false)
 
   const selectedVariant = useMemo(() => {
     return visualVariants.find((variant) => String(variant.id) === selectedVariantId)
@@ -139,19 +140,31 @@ function ProductCard({
     }
   }
 
-  function handleToggleWishlist(event) {
+  async function handleToggleWishlist(event) {
     event.stopPropagation()
 
-    const result = toggleItem(product)
-
-    if (!result.ok) {
-      setActionMessage('')
-      setActionError('Sign in first to save products to your wishlist.')
+    if (wishlistBusy) {
       return
     }
 
-    setActionError('')
-    setActionMessage(result.saved ? 'Saved to wishlist.' : 'Removed from wishlist.')
+    setWishlistBusy(true)
+
+    try {
+      const result = await toggleItem(product, selectedVariant?.id)
+
+      if (!result.ok) {
+        setActionMessage('')
+        setActionError(result.reason === 'auth'
+          ? 'Sign in first to save products to your wishlist.'
+          : 'Unable to update your wishlist right now.')
+        return
+      }
+
+      setActionError('')
+      setActionMessage(result.saved ? 'Saved to wishlist.' : 'Removed from wishlist.')
+    } finally {
+      setWishlistBusy(false)
+    }
   }
 
   function handleOpenQuickView(event) {
@@ -424,7 +437,7 @@ function ProductCard({
                   onClick={handleToggleWishlist}
                   aria-label={wishlistLabel}
                   title={wishlistLabel}
-                  disabled={quickViewBusy}
+                  disabled={quickViewBusy || wishlistBusy}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
@@ -474,6 +487,7 @@ function ProductCard({
                 aria-label={wishlistLabel}
                 title={wishlistLabel}
                 onClick={handleToggleWishlist}
+                disabled={wishlistBusy}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
@@ -609,6 +623,7 @@ function ProductCard({
               aria-label={wishlistLabel}
               title={wishlistLabel}
               onClick={handleToggleWishlist}
+              disabled={wishlistBusy}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
@@ -721,6 +736,19 @@ function ProductCard({
                 <path d="m10 14 2 2 3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="sr-only">Buy now</span>
+            </button>
+            <button
+              type="button"
+              className={`button button-secondary product-card-action-icon product-card-mobile-wishlist${inWishlist ? ' active' : ''}`}
+              disabled={wishlistBusy}
+              aria-label={wishlistLabel}
+              title={wishlistLabel}
+              onClick={handleToggleWishlist}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 20.2 10.7 19C5.8 14.5 2.5 11.5 2.5 7.8A4.8 4.8 0 0 1 7.3 3a5.3 5.3 0 0 1 4.7 2.6A5.3 5.3 0 0 1 16.7 3a4.8 4.8 0 0 1 4.8 4.8c0 3.7-3.3 6.7-8.2 11.2Z" fill={inWishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="sr-only">{wishlistLabel}</span>
             </button>
           </div>
           <p className={`product-card-feedback${actionError ? ' error' : actionMessage ? ' success' : ''}`} role="status" aria-live="polite">

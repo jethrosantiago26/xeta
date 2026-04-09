@@ -94,6 +94,18 @@ export async function removeCartItem(cartItemId) {
   return api.delete(`/cart/${cartItemId}`)
 }
 
+export async function getWishlist() {
+  return api.get('/wishlist')
+}
+
+export async function addWishlistItem(payload) {
+  return api.post('/wishlist', payload)
+}
+
+export async function removeWishlistItem(wishlistItemId) {
+  return api.delete(`/wishlist/${wishlistItemId}`)
+}
+
 export async function placeCashOnDeliveryOrder(payload) {
   return api.post('/checkout/place-order', payload)
 }

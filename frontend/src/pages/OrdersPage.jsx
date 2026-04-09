@@ -240,7 +240,7 @@ function OrdersPage() {
   }, [loadOrders, reloadKey])
 
   return (
-    <div className="page-grid">
+    <div className="page-grid orders-page-grid">
       <PageHeader
         eyebrow="Purchases"
         title="Orders"

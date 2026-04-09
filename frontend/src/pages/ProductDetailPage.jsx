@@ -28,6 +28,7 @@ function ProductDetailPage() {
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [adding, setAdding] = useState(false)
+  const [wishlistBusy, setWishlistBusy] = useState(false)
   
   // Cart Bottom Sheet state
   const [showCartSheet, setShowCartSheet] = useState(false)
@@ -281,21 +282,33 @@ function ProductDetailPage() {
   const productWishlisted = product ? isWishlisted(product) : false
   const wishlistActionLabel = productWishlisted ? 'Remove from wishlist' : 'Save to wishlist'
 
-  function handleToggleWishlist() {
+  async function handleToggleWishlist() {
     if (!product) {
       return
     }
 
-    const result = toggleItem(product)
-
-    if (!result.ok) {
-      setActionMessage('')
-      setActionError('Sign in first to save products to your wishlist.')
+    if (wishlistBusy) {
       return
     }
 
-    setActionError('')
-    setActionMessage(result.saved ? 'Saved to wishlist.' : 'Removed from wishlist.')
+    setWishlistBusy(true)
+
+    try {
+      const result = await toggleItem(product, selectedVariant?.id)
+
+      if (!result.ok) {
+        setActionMessage('')
+        setActionError(result.reason === 'auth'
+          ? 'Sign in first to save products to your wishlist.'
+          : 'Unable to update your wishlist right now.')
+        return
+      }
+
+      setActionError('')
+      setActionMessage(result.saved ? 'Saved to wishlist.' : 'Removed from wishlist.')
+    } finally {
+      setWishlistBusy(false)
+    }
   }
 
   if (loading) {
@@ -441,6 +454,7 @@ function ProductDetailPage() {
             <button
               type="button"
               className="button button-secondary"
+              disabled={wishlistBusy}
               onClick={handleToggleWishlist}
               aria-label={wishlistActionLabel}
               title={wishlistActionLabel}

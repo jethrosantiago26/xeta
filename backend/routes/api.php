@@ -95,7 +95,7 @@ Route::prefix('v1')->group(function () {
 
             // Variant Management
             Route::post('products/{product}/variants', [AdminProductController::class, 'storeVariant']);
-            Route::put('products/{product}/variants/{variant}', [AdminProductController::class, 'updateVariant']);
+            Route::match(['put', 'post'], 'products/{product}/variants/{variant}', [AdminProductController::class, 'updateVariant']);
             Route::delete('products/{product}/variants/{variant}', [AdminProductController::class, 'destroyVariant']);
 
             // Order Management

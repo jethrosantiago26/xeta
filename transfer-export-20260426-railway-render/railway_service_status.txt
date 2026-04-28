@@ -1,3 +1,0 @@
-﻿Service: MySQL
-Deployment: 0de961f6-c3e9-413b-ab4f-0e184738adcd
-Status: SUCCESS

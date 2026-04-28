@@ -1,3 +1,0 @@
-﻿Project: xeta
-Environment: production
-Service: MySQL

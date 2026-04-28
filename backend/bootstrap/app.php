@@ -20,10 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureAdmin::class,
         ]);
 
-        // Handle _method override for FormData file uploads (must be on API stack, not web)
-        $middleware->api(append: [
-            MethodOverride::class,
-        ]);
+        // Handle _method override for FormData file uploads - register globally
+        $middleware->append(MethodOverride::class);
 
         // Trust proxies for Railway / reverse proxy
         $middleware->trustProxies(at: '*');

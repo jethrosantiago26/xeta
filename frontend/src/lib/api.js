@@ -203,13 +203,27 @@ export async function forceDeleteAdminProduct(productId) {
 }
 
 export async function createAdminProductVariant(productId, payload) {
+  if (payload instanceof FormData) {
+    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically for multipart/form-data
+    return api.post(`/admin/products/${productId}/variants`, payload, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    })
+  }
   return api.post(`/admin/products/${productId}/variants`, payload)
 }
 
 export async function updateAdminProductVariant(productId, variantId, payload) {
   if (payload instanceof FormData) {
     payload.append('_method', 'PUT')
-    return api.post(`/admin/products/${productId}/variants/${variantId}`, payload)
+    // Let axios and the browser handle Content-Type for FormData (multipart/form-data with boundary)
+    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically
+    return api.post(`/admin/products/${productId}/variants/${variantId}`, payload, {
+      headers: {
+        'Content-Type': undefined, // Remove default header to allow browser to set multipart/form-data
+      },
+    })
   }
 
   return api.put(`/admin/products/${productId}/variants/${variantId}`, payload)

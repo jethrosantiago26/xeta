@@ -57,11 +57,18 @@ class ClerkService
 
         return Cache::remember('clerk_jwks', $cacheTtl, function () {
             $jwksUrl = config('clerk.jwks_url');
+            $secretKey = config('clerk.secret_key');
 
             Log::debug('Attempting to fetch Clerk JWKS', ['url' => $jwksUrl]);
 
             try {
-                $response = Http::timeout(3)->get($jwksUrl);
+                $request = Http::timeout(3);
+                
+                if (str_contains($jwksUrl, 'api.clerk.com') && $secretKey) {
+                    $request->withToken($secretKey);
+                }
+
+                $response = $request->get($jwksUrl);
 
                 if (!$response->successful()) {
                     Log::error('Failed to fetch Clerk JWKS', [

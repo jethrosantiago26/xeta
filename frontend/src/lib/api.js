@@ -179,10 +179,25 @@ export async function getAdminProducts(params = {}) {
 }
 
 export async function createAdminProduct(payload) {
+  if (payload instanceof FormData) {
+    return api.post('/admin/products', payload, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    })
+  }
   return api.post('/admin/products', payload)
 }
 
 export async function updateAdminProduct(productId, payload) {
+  if (payload instanceof FormData) {
+    payload.append('_method', 'PUT')
+    return api.post(`/admin/products/${productId}`, payload, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    })
+  }
   return api.put(`/admin/products/${productId}`, payload)
 }
 
@@ -217,10 +232,10 @@ export async function createAdminProductVariant(productId, payload) {
 
 export async function updateAdminProductVariant(productId, variantId, payload) {
   if (payload instanceof FormData) {
-    // FormData uploads: route accepts both PUT and POST
-    // Use PUT to match REST convention, let axios handle the request properly
-    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically
-    return api.put(`/admin/products/${productId}/variants/${variantId}`, payload, {
+    // FormData uploads should use POST here so Laravel parses multipart data and files reliably.
+    // The backend route accepts both POST and PUT for this update endpoint.
+    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically.
+    return api.post(`/admin/products/${productId}/variants/${variantId}`, payload, {
       headers: {
         'Content-Type': undefined,
       },
@@ -319,10 +334,25 @@ export async function getAdminPromotions(params = {}) {
 }
 
 export async function createAdminPromotion(payload) {
+  if (payload instanceof FormData) {
+    return api.post('/admin/promotions', payload, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    })
+  }
   return api.post('/admin/promotions', payload)
 }
 
 export async function updateAdminPromotion(promotionId, payload) {
+  if (payload instanceof FormData) {
+    payload.append('_method', 'PUT')
+    return api.post(`/admin/promotions/${promotionId}`, payload, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    })
+  }
   return api.put(`/admin/promotions/${promotionId}`, payload)
 }
 

@@ -332,6 +332,10 @@ function OrdersPage() {
                         const productSlug = item?.product?.slug
                         const itemReview = item?.review
                         const productLink = productSlug ? `/products/${productSlug}` : null
+                        const itemDiscount = Number(item.discount_total ?? 0)
+                        const baseUnitPrice = Number(item.base_unit_price ?? item.unit_price ?? 0)
+                        const unitPrice = Number(item.unit_price ?? 0)
+                        const hasItemDiscount = itemDiscount > 0 && baseUnitPrice > unitPrice
 
                         return (
                           <div key={item.id} className="order-item-card">
@@ -354,13 +358,26 @@ function OrdersPage() {
                               </div>
 
                               <div className="row" style={{ justifyContent: 'space-between' }}>
-                                <p className="muted order-item-meta">Qty {item.quantity} · {formatMoney(item.unit_price)} each</p>
+                                <p className="muted order-item-meta">
+                                  Qty {item.quantity} · {formatMoney(unitPrice)} each
+                                  {hasItemDiscount ? (
+                                    <span style={{ marginLeft: '8px', textDecoration: 'line-through', opacity: 0.62 }}>
+                                      {formatMoney(baseUnitPrice)}
+                                    </span>
+                                  ) : null}
+                                </p>
                                 {productLink ? (
                                   <Link className="order-item-link" to={productLink}>
                                     View
                                   </Link>
                                 ) : null}
                               </div>
+
+                              {itemDiscount > 0 ? (
+                                <p className="muted" style={{ margin: 0, fontSize: '12px', color: 'var(--color-success-text)' }}>
+                                  Saved {formatMoney(itemDiscount)} on this item
+                                </p>
+                              ) : null}
 
                               {itemReview && productLink ? (
                                 <Link className="order-item-review-link" to={productLink} title="Open product page">
@@ -385,6 +402,12 @@ function OrdersPage() {
                   <span>Total</span>
                   <strong>{formatMoney(order.total)}</strong>
                 </div>
+                {Number(order.discount_total ?? 0) > 0 ? (
+                  <div className="row" style={{ justifyContent: 'space-between', color: 'var(--color-success-text)' }}>
+                    <span>Total savings</span>
+                    <strong>-{formatMoney(order.discount_total)}</strong>
+                  </div>
+                ) : null}
               </article>
             )
           })

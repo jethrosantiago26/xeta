@@ -59,6 +59,14 @@ function readFileAsDataUrl(file) {
 }
 
 function extractRequestError(requestError, fallbackMessage) {
+  if (requestError?.response?.status === 413) {
+    return 'Image upload is too large. Please use an image up to 5 MB.'
+  }
+
+  if (!requestError?.response && requestError?.message === 'Network Error') {
+    return 'Request failed before reaching the API. If you uploaded an image, keep it up to 5 MB and try again.'
+  }
+
   const payload = requestError?.response?.data
   if (payload?.errors && typeof payload.errors === 'object') {
     const firstError = Object.values(payload.errors)?.[0]
@@ -66,6 +74,8 @@ function extractRequestError(requestError, fallbackMessage) {
   }
   return payload?.message || fallbackMessage
 }
+
+const MAX_VARIANT_IMAGE_BYTES = 5 * 1024 * 1024
 
 const defaultVariant = {
   name: 'Default',
@@ -187,12 +197,23 @@ function ProductEditorPanel({ product, onClose, onSaved }) {
       handleVariantChange(index, 'image_preview', '')
       return
     }
-    const preview = await readFileAsDataUrl(file)
-    setVariants((current) => {
-      const next = [...current]
-      next[index] = { ...next[index], image_file: file, image_preview: preview, remove_image: false }
-      return next
-    })
+
+    if (file.size > MAX_VARIANT_IMAGE_BYTES) {
+      setError('Image is too large. Please use an image up to 5 MB.')
+      return
+    }
+
+    try {
+      const preview = await readFileAsDataUrl(file)
+      setVariants((current) => {
+        const next = [...current]
+        next[index] = { ...next[index], image_file: file, image_preview: preview, remove_image: false }
+        return next
+      })
+      setError('')
+    } catch (previewError) {
+      setError(previewError instanceof Error ? previewError.message : 'Image preview failed to load.')
+    }
   }
 
   function clearVariantImage(index) {

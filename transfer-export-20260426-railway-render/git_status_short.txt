@@ -1,0 +1,74 @@
+﻿ M backend/.env.example
+ M backend/Dockerfile
+ M backend/app/Http/Controllers/Api/Admin/CustomerController.php
+ D backend/app/Http/Controllers/Api/Admin/NotificationController.php
+ M backend/app/Http/Controllers/Api/Admin/OrderController.php
+ M backend/app/Http/Controllers/Api/Admin/ProductController.php
+ M backend/app/Http/Controllers/Api/Admin/ReviewController.php
+ M backend/app/Http/Controllers/Api/Admin/SupportTicketController.php
+ M backend/app/Http/Controllers/Api/AuthController.php
+ M backend/app/Http/Controllers/Api/CartController.php
+ M backend/app/Http/Controllers/Api/SupportTicketController.php
+ D backend/app/Http/Requests/SendMarketingEmailRequest.php
+ M backend/app/Http/Requests/UpdateProfileRequest.php
+ M backend/app/Http/Resources/CartItemResource.php
+ M backend/app/Http/Resources/OrderItemResource.php
+ M backend/app/Http/Resources/OrderResource.php
+ M backend/app/Http/Resources/ProductResource.php
+ M backend/app/Http/Resources/ProductVariantResource.php
+ M backend/app/Http/Resources/UserResource.php
+ M backend/app/Models/Category.php
+ M backend/app/Models/Order.php
+ M backend/app/Models/OrderItem.php
+ M backend/app/Models/Product.php
+ M backend/app/Models/User.php
+ M backend/app/Services/CartService.php
+ M backend/app/Services/OrderService.php
+ M backend/app/Services/VariantVisualService.php
+ M backend/config/cors.php
+ D backend/database/migrations/2026_04_06_000001_add_notification_preferences_to_users_table.php
+ M backend/docker/nginx.conf
+ M backend/routes/api.php
+ M frontend/.gitignore
+ M frontend/src/App.css
+ M frontend/src/App.jsx
+ M frontend/src/components/ProductCard.jsx
+ M frontend/src/components/ProductEditorPanel.jsx
+ M frontend/src/components/layout/AppLayout.jsx
+ M frontend/src/context/CartContext.jsx
+ M frontend/src/context/WishlistContext.jsx
+ M frontend/src/lib/api.js
+ M frontend/src/pages/AccountPage.jsx
+ M frontend/src/pages/AdminCustomersPage.jsx
+ M frontend/src/pages/AdminInventoryPage.jsx
+ D frontend/src/pages/AdminNotificationsPage.jsx
+ M frontend/src/pages/AdminOrdersPage.jsx
+ M frontend/src/pages/AdminProductsPage.jsx
+ M frontend/src/pages/AdminReviewsPage.jsx
+ M frontend/src/pages/AdminSupportPage.jsx
+ M frontend/src/pages/CartPage.jsx
+ M frontend/src/pages/CheckoutPage.jsx
+ M frontend/src/pages/OrdersPage.jsx
+ M frontend/src/pages/ProductDetailPage.jsx
+ M frontend/src/pages/ProductsPage.jsx
+ M frontend/src/pages/SupportPage.jsx
+?? _live_admin_products_chunk.js
+?? _live_index.html
+?? _live_index_bundle.js
+?? _live_index_styles.css
+?? backend/app/Http/Controllers/Api/Admin/PromotionController.php
+?? backend/app/Http/Requests/StorePromotionRequest.php
+?? backend/app/Http/Requests/UpdatePromotionRequest.php
+?? backend/app/Http/Resources/PromotionResource.php
+?? backend/app/Models/Promotion.php
+?? backend/app/Models/PromotionRedemption.php
+?? backend/app/Services/PromotionEngineService.php
+?? backend/app/Services/PromotionService.php
+?? backend/config/products.php
+?? backend/config/support.php
+?? backend/database/migrations/2026_04_09_180000_create_promotions_tables.php
+?? backend/database/migrations/2026_04_09_180100_add_discount_fields_to_orders_and_order_items.php
+?? backend/database/migrations/2026_04_13_000001_drop_notification_preferences_from_users_table.php
+?? backend/tests/Feature/
+?? frontend/src/pages/AdminPromotionsPage.jsx
+?? transfer-export-20260426-railway-render/

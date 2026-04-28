@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import PageHeader from '../components/PageHeader.jsx'
 import { 
   deleteAdminReview, 
@@ -8,13 +8,29 @@ import {
   restoreAdminReview, 
   forceDeleteAdminReview 
 } from '../lib/api.js'
-import { RotateCcw, AlertTriangle, Star, MessageSquare } from 'lucide-react'
+import { Archive, RotateCcw, AlertTriangle, Star, MessageSquare } from 'lucide-react'
 
 const REVIEW_TABS = [
   { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
+  { key: 'pending', label: 'Needs Review' },
   { key: 'approved', label: 'Approved' },
 ]
+
+function extractCollectionTotal(payload) {
+  const total = Number(
+    payload?.data?.meta?.total
+    ?? payload?.meta?.total
+    ?? payload?.data?.total
+    ?? payload?.total,
+  )
+
+  if (Number.isFinite(total)) {
+    return total
+  }
+
+  const rows = payload?.data?.data ?? payload?.data ?? []
+  return Array.isArray(rows) ? rows.length : 0
+}
 
 function StarRating({ rating }) {
   return (
@@ -36,34 +52,59 @@ function AdminReviewsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('pending')
-  const [withArchived, setWithArchived] = useState(false)
+  const [archivedOnly, setArchivedOnly] = useState(false)
+  const [reviewCounts, setReviewCounts] = useState({ active: 0, archived: 0 })
+  const [countsReady, setCountsReady] = useState(false)
 
-  async function loadReviews() {
+  const loadReviews = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const response = await getAdminReviews({ per_page: 50, with_archived: withArchived ? 1 : 0 })
+      const [response, activeCountResponse, allCountResponse] = await Promise.all([
+        getAdminReviews({ per_page: 50, with_archived: 1 }),
+        getAdminReviews({ per_page: 1, with_archived: 0 }),
+        getAdminReviews({ per_page: 1, with_archived: 1 }),
+      ])
+
       const payload = readResource(response)
+      const activeCountPayload = readResource(activeCountResponse)
+      const allCountPayload = readResource(allCountResponse)
+
       setReviews(Array.isArray(payload?.data) ? payload.data : [])
+
+      const activeCount = extractCollectionTotal(activeCountPayload)
+      const allCount = extractCollectionTotal(allCountPayload)
+
+      setReviewCounts({
+        active: activeCount,
+        archived: Math.max(0, allCount - activeCount),
+      })
+      setCountsReady(true)
     } catch {
       setError('Failed to load reviews.')
+      setCountsReady(false)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { loadReviews() }, [withArchived])
+  useEffect(() => { loadReviews() }, [loadReviews])
 
   // Client-side tab filtering (no API refetch on tab switch)
   const filteredReviews = useMemo(() => {
-    if (activeTab === 'all') return reviews
-    if (activeTab === 'approved') return reviews.filter((r) => r.is_approved && !r.deleted_at)
-    if (activeTab === 'pending') return reviews.filter((r) => !r.is_approved && !r.deleted_at)
-    return reviews
-  }, [reviews, activeTab])
+    if (archivedOnly) {
+      return reviews.filter((review) => !!review.deleted_at)
+    }
+
+    const activeReviews = reviews.filter((review) => !review.deleted_at)
+    if (activeTab === 'all') return activeReviews
+    if (activeTab === 'approved') return activeReviews.filter((review) => review.is_approved)
+    if (activeTab === 'pending') return activeReviews.filter((review) => !review.is_approved)
+    return activeReviews
+  }, [reviews, archivedOnly, activeTab])
 
   const tabCounts = useMemo(() => ({
-    all: reviews.length,
+    all: reviews.filter((review) => !review.deleted_at).length,
     approved: reviews.filter((r) => r.is_approved && !r.deleted_at).length,
     pending: reviews.filter((r) => !r.is_approved && !r.deleted_at).length,
   }), [reviews])
@@ -116,18 +157,42 @@ function AdminReviewsPage() {
           title="Reviews"
           description="Approve, hide, or remove customer product feedback."
         />
-        <label className="admin-archive-toggle">
-          <input
-            type="checkbox"
-            checked={withArchived}
-            onChange={(e) => { setWithArchived(e.target.checked); setActiveTab('all') }}
-          />
-          Show Archived
-        </label>
+        <div className="pipeline-tabs" role="tablist" aria-label="Review list view mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!archivedOnly}
+            className={`pipeline-tab${!archivedOnly ? ' active' : ''}`}
+            onClick={() => {
+              setArchivedOnly(false)
+              setActiveTab('pending')
+            }}
+          >
+            Active
+            <span className={`pipeline-tab-count${!countsReady ? ' loading' : ''}`}>
+              {countsReady ? reviewCounts.active : ''}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={archivedOnly}
+            className={`pipeline-tab${archivedOnly ? ' active' : ''}`}
+            onClick={() => {
+              setArchivedOnly(true)
+              setActiveTab('all')
+            }}
+          >
+            Archived
+            <span className={`pipeline-tab-count${!countsReady ? ' loading' : ''}`}>
+              {countsReady ? reviewCounts.archived : ''}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Pipeline tabs */}
-      {!withArchived && (
+      {!archivedOnly && (
         <div className="pipeline-tabs">
           {REVIEW_TABS.map((tab) => (
             <button
@@ -154,7 +219,11 @@ function AdminReviewsPage() {
             <div className="content-card" style={{ padding: '48px', textAlign: 'center' }}>
               <MessageSquare size={40} style={{ opacity: 0.2, margin: '0 auto 12px' }} />
               <p className="muted" style={{ margin: 0 }}>
-                {activeTab === 'pending' ? 'No reviews awaiting moderation.' : 'No reviews found.'}
+                {archivedOnly
+                  ? 'No archived reviews found.'
+                  : activeTab === 'pending'
+                    ? 'No reviews need moderation right now.'
+                    : 'No reviews found.'}
               </p>
             </div>
           ) : (
@@ -197,7 +266,7 @@ function AdminReviewsPage() {
                               : 'warning'
                           }`}
                         >
-                          {isArchived ? 'Archived' : review.is_approved ? 'Public' : 'Pending'}
+                          {isArchived ? 'Archived' : review.is_approved ? 'Public' : 'Needs Review'}
                         </span>
                       </div>
                     </div>
@@ -255,10 +324,11 @@ function AdminReviewsPage() {
                         <button
                           type="button"
                           className="button button-secondary"
-                          style={{ color: 'var(--color-error)' }}
+                          style={{ color: 'var(--color-notice-text)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                           onClick={() => handleArchive(review)}
                           title="Archive review"
                         >
+                          <Archive size={14} />
                           Archive
                         </button>
                       )}

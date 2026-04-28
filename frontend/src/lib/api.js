@@ -194,8 +194,12 @@ export async function restoreAdminProduct(productId) {
   return api.post(`/admin/products/${productId}/restore`)
 }
 
-export async function forceDeleteAdminProduct(productId) {
+export async function deleteArchivedAdminProduct(productId) {
   return api.delete(`/admin/products/${productId}/force`)
+}
+
+export async function forceDeleteAdminProduct(productId) {
+  return deleteArchivedAdminProduct(productId)
 }
 
 export async function createAdminProductVariant(productId, payload) {
@@ -295,8 +299,24 @@ export async function getAdminAnalytics(params = {}) {
   return api.get('/admin/analytics', { params })
 }
 
-export async function sendAdminMarketingNotification(payload) {
-  return api.post('/admin/notifications/marketing', payload)
+export async function getAdminPromotions(params = {}) {
+  return api.get('/admin/promotions', { params })
+}
+
+export async function createAdminPromotion(payload) {
+  return api.post('/admin/promotions', payload)
+}
+
+export async function updateAdminPromotion(promotionId, payload) {
+  return api.put(`/admin/promotions/${promotionId}`, payload)
+}
+
+export async function setAdminPromotionActive(promotionId, isActive) {
+  return api.put(`/admin/promotions/${promotionId}/active`, { is_active: isActive })
+}
+
+export async function deleteAdminPromotion(promotionId) {
+  return api.delete(`/admin/promotions/${promotionId}`)
 }
 
 export function readResource(response) {

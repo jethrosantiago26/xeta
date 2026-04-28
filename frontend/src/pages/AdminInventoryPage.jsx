@@ -105,7 +105,7 @@ function AdminInventoryPage() {
   const lowCount = tabCounts.low
 
   return (
-    <div className="page-grid">
+    <div className="page-grid admin-inventory-page">
       <PageHeader
         eyebrow="Operations"
         title="Inventory"
@@ -135,7 +135,7 @@ function AdminInventoryPage() {
       )}
 
       {/* Tabs + Search row */}
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="admin-toolbar-row" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div className="pipeline-tabs" style={{ flex: 1, minWidth: 'auto' }}>
           {STOCK_TABS.map((tab) => (
             <button
@@ -165,8 +165,8 @@ function AdminInventoryPage() {
       {error && <div className="notice error">{error}</div>}
 
       {!loading && !error && (
-        <section className="content-card" style={{ overflowX: 'auto', padding: 0 }}>
-          <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <section className="content-card admin-table-shell" style={{ overflowX: 'auto', padding: 0 }}>
+          <table className="admin-data-table" style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '14px 16px', width: '12px' }} />
@@ -202,7 +202,7 @@ function AdminInventoryPage() {
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
                       {/* Color dot */}
-                      <td style={{ padding: '14px 8px 14px 16px' }}>
+                      <td data-label="Color" style={{ padding: '14px 8px 14px 16px' }}>
                         {colorDot ? (
                           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: colorDot, border: '1px solid rgba(255,255,255,0.2)' }} />
                         ) : (
@@ -211,18 +211,18 @@ function AdminInventoryPage() {
                       </td>
 
                       {/* Product */}
-                      <td style={{ padding: '14px 16px', fontWeight: 600 }}>
+                      <td data-label="Product" style={{ padding: '14px 16px', fontWeight: 600 }}>
                         {variant.product?.name ?? '—'}
                       </td>
 
                       {/* Variant + SKU */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Variant / SKU" style={{ padding: '14px 16px' }}>
                         <div>{variant.name}</div>
                         <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'monospace', marginTop: '2px' }}>{variant.sku}</div>
                       </td>
 
                       {/* Status badge */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Status" style={{ padding: '14px 16px' }}>
                         {status === 'critical' && (
                           <span className="status-pill status-cancelled">Out of Stock</span>
                         )}
@@ -235,7 +235,7 @@ function AdminInventoryPage() {
                       </td>
 
                       {/* Current qty */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Qty" style={{ padding: '14px 16px' }}>
                         <span style={{
                           fontSize: '18px',
                           fontWeight: 700,
@@ -250,7 +250,7 @@ function AdminInventoryPage() {
                       </td>
 
                       {/* Input */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Update" style={{ padding: '14px 16px' }}>
                         <input
                           type="number"
                           className="input"
@@ -263,7 +263,7 @@ function AdminInventoryPage() {
                       </td>
 
                       {/* Save */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Save" style={{ padding: '14px 16px' }}>
                         <button
                           type="button"
                           className="button button-primary"

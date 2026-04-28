@@ -89,6 +89,13 @@ class ReviewController extends Controller
     public function forceDelete($id): JsonResponse
     {
         $review = Review::withTrashed()->findOrFail($id);
+
+        if (!$review->trashed()) {
+            return response()->json([
+                'message' => 'Only archived reviews can be permanently deleted. Archive this review first.',
+            ], 422);
+        }
+
         $review->forceDelete();
 
         return response()->json(['message' => 'Review permanently deleted']);

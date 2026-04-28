@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\ClerkAuthenticate;
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\MethodOverride;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -17,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'clerk' => ClerkAuthenticate::class,
             'admin' => EnsureAdmin::class,
+        ]);
+
+        // Handle _method override for FormData file uploads
+        $middleware->web(append: [
+            MethodOverride::class,
         ]);
 
         // Trust proxies for Railway / reverse proxy

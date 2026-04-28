@@ -85,7 +85,7 @@ class CustomerController extends Controller
     public function destroy($id): JsonResponse
     {
         $customer = User::where('role', 'customer')->findOrFail($id);
-        
+
         $customer->delete(); // Soft delete
 
         return response()->json([
@@ -99,7 +99,7 @@ class CustomerController extends Controller
     public function restore($id): JsonResponse
     {
         $customer = User::onlyTrashed()->where('role', 'customer')->findOrFail($id);
-        
+
         $customer->restore();
 
         return response()->json([
@@ -114,7 +114,13 @@ class CustomerController extends Controller
     public function forceDelete($id): JsonResponse
     {
         $customer = User::withTrashed()->where('role', 'customer')->findOrFail($id);
-        
+
+        if (!$customer->trashed()) {
+            return response()->json([
+                'message' => 'Only archived customers can be permanently deleted. Archive this customer first.',
+            ], 422);
+        }
+
         $customer->forceDelete();
 
         return response()->json([

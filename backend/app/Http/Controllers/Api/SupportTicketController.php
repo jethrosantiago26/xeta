@@ -128,7 +128,13 @@ class SupportTicketController extends Controller
             return null;
         }
 
-        $path = Storage::disk('public')->putFile('support-attachments', $request->file('image'));
+        $diskName = $this->resolveAttachmentDisk();
+        $directory = trim((string) config('support.attachments_directory', 'support-attachments'), '/');
+
+        $path = Storage::disk($diskName)->putFile(
+            $directory !== '' ? $directory : 'support-attachments',
+            $request->file('image'),
+        );
 
         if (!$path) {
             throw ValidationException::withMessages([
@@ -136,6 +142,40 @@ class SupportTicketController extends Controller
             ]);
         }
 
-        return '/storage/' . ltrim(str_replace('\\', '/', $path), '/');
+        return $this->resolveAttachmentUrl($diskName, $path);
+    }
+
+    private function resolveAttachmentDisk(): string
+    {
+        $configured = trim((string) config('support.attachments_disk', 'public'));
+        $diskName = $configured !== '' ? $configured : 'public';
+
+        // The default local disk is private in this project, so map it to the public disk for attachments.
+        if ($diskName === 'local') {
+            $diskName = 'public';
+        }
+
+        if (!is_array(config("filesystems.disks.{$diskName}"))) {
+            return 'public';
+        }
+
+        return $diskName;
+    }
+
+    private function resolveAttachmentUrl(string $diskName, string $path): string
+    {
+        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
+
+        if ($diskName === 'public') {
+            return '/storage/' . $normalizedPath;
+        }
+
+        $diskUrl = rtrim((string) config("filesystems.disks.{$diskName}.url", ''), '/');
+
+        if ($diskUrl !== '') {
+            return $diskUrl . '/' . $normalizedPath;
+        }
+
+        return '/storage/' . $normalizedPath;
     }
 }

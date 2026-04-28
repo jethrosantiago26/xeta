@@ -8,7 +8,13 @@ function getCartItemImage(item) {
 }
 
 function CartPage() {
-  const { items, totals, loading, updateItem, removeItem } = useCart()
+  const {
+    items,
+    totals,
+    loading,
+    updateItem,
+    removeItem,
+  } = useCart()
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
@@ -49,6 +55,11 @@ function CartPage() {
               const colorHex = item?.variant?.color_hex
               const productName = normalizeDisplayText(item.product?.name) || 'Product'
               const variantName = normalizeDisplayText(item.variant?.name) || 'Standard variant'
+              const unitPrice = Number(item.unit_price ?? item.variant?.sale_price ?? item.variant?.price ?? 0)
+              const baseUnitPrice = Number(item.base_unit_price ?? item.variant?.price ?? unitPrice)
+              const lineSubtotal = Number(item.line_subtotal ?? baseUnitPrice * Number(item.quantity ?? 0))
+              const lineDiscount = Number(item.line_discount ?? Math.max(0, lineSubtotal - Number(item.line_total ?? 0)))
+              const lineTotal = Number(item.line_total ?? unitPrice * Number(item.quantity ?? 0))
 
               return (
                 <article key={item.id} className="cart-item-card">
@@ -76,9 +87,21 @@ function CartPage() {
                           {productName}
                         </Link>
                         <span className="cart-item-variant-name">{variantName}</span>
-                        <span className="cart-item-unit-price">{formatMoney(item.variant?.price)} each</span>
+                        <span className="cart-item-unit-price">
+                          {formatMoney(unitPrice)} each
+                          {baseUnitPrice > unitPrice ? (
+                            <span style={{ marginLeft: '8px', textDecoration: 'line-through', opacity: 0.62 }}>
+                              {formatMoney(baseUnitPrice)}
+                            </span>
+                          ) : null}
+                        </span>
+                        {lineDiscount > 0 ? (
+                          <span className="muted" style={{ fontSize: '12px', color: 'var(--color-success-text)' }}>
+                            You saved {formatMoney(lineDiscount)} on this item
+                          </span>
+                        ) : null}
                       </div>
-                      <strong className="cart-item-line-total">{formatMoney(item.line_total)}</strong>
+                      <strong className="cart-item-line-total">{formatMoney(lineTotal)}</strong>
                     </div>
 
                     <div className="cart-item-actions">
@@ -133,11 +156,24 @@ function CartPage() {
           <div className="cart-summary-column">
             <div className="cart-summary-card">
               <h3 className="cart-summary-title">Order summary</h3>
+
               <div className="cart-summary-rows">
                 <div className="cart-summary-row">
                   <span>Subtotal</span>
                   <span>{formatMoney(totals.subtotal)}</span>
                 </div>
+                {Number(totals.item_discount ?? 0) > 0 ? (
+                  <div className="cart-summary-row" style={{ color: 'var(--color-success-text)' }}>
+                    <span>Item discounts</span>
+                    <span>-{formatMoney(totals.item_discount)}</span>
+                  </div>
+                ) : null}
+                {Number(totals.order_discount ?? 0) > 0 ? (
+                  <div className="cart-summary-row" style={{ color: 'var(--color-success-text)' }}>
+                    <span>Additional discount</span>
+                    <span>-{formatMoney(totals.order_discount)}</span>
+                  </div>
+                ) : null}
                 <div className="cart-summary-row">
                   <span>Shipping</span>
                   <span>{totals.shipping === 0 ? 'Free' : formatMoney(totals.shipping)}</span>
@@ -147,6 +183,12 @@ function CartPage() {
                   <span>Total</span>
                   <strong>{formatMoney(totals.total)}</strong>
                 </div>
+                {Number(totals.discount_total ?? 0) > 0 ? (
+                  <div className="cart-summary-row" style={{ color: 'var(--color-success-text)' }}>
+                    <span>Total savings</span>
+                    <strong>-{formatMoney(totals.discount_total)}</strong>
+                  </div>
+                ) : null}
               </div>
               <Link className="button button-primary cart-checkout-btn" to="/checkout">
                 Proceed to checkout

@@ -1,0 +1,2 @@
+﻿origin	https://github.com/jethrosantiago26/xeta.git (fetch)
+origin	https://github.com/jethrosantiago26/xeta.git (push)

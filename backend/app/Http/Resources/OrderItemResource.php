@@ -45,9 +45,12 @@ class OrderItemResource extends JsonResource
             'id' => $this->id,
             'product_name' => $this->normalizeDisplayText($this->product_name),
             'variant_name' => $this->normalizeDisplayText($this->variant_name),
+            'base_unit_price' => $this->base_unit_price !== null ? (float) $this->base_unit_price : null,
             'unit_price' => (float) $this->unit_price,
             'quantity' => $this->quantity,
             'total' => (float) $this->total,
+            'discount_total' => (float) $this->discount_total,
+            'applied_promotions' => is_array($this->applied_promotions) ? $this->applied_promotions : [],
             'product' => [
                 'id' => $product?->id,
                 'slug' => $product?->slug,

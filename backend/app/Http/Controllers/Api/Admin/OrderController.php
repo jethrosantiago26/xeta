@@ -30,9 +30,25 @@ class OrderController extends Controller
 
         $orderIds = $validated['order_ids'];
         $action = $validated['action'];
-        $count = count($orderIds);
 
         $orders = Order::withTrashed()->whereIn('id', $orderIds)->get();
+
+        $containsArchived = $orders->contains(fn (Order $order) => $order->trashed());
+        $containsActive = $orders->contains(fn (Order $order) => !$order->trashed());
+
+        if (($action === 'restore' || $action === 'force_delete') && $containsActive) {
+            return response()->json([
+                'message' => 'Please select archived orders only for restore or permanent delete actions.',
+            ], 422);
+        }
+
+        if ($action === 'archive' && $containsArchived) {
+            return response()->json([
+                'message' => 'Archive action only applies to active orders.',
+            ], 422);
+        }
+
+        $processedCount = 0;
 
         foreach ($orders as $order) {
             if (!$order instanceof Order) {
@@ -49,10 +65,12 @@ class OrderController extends Controller
             } elseif ($action === 'force_delete') {
                 $order->forceDelete();
             }
+
+            $processedCount += 1;
         }
 
         return response()->json([
-            'message' => "Successfully applied action to {$count} orders"
+            'message' => "Successfully applied action to {$processedCount} orders"
         ]);
     }
 
@@ -111,7 +129,16 @@ class OrderController extends Controller
      */
     public function forceDelete(int $order): JsonResponse
     {
-        Order::withTrashed()->findOrFail($order)->forceDelete();
+        $orderModel = Order::withTrashed()->findOrFail($order);
+
+        if (!$orderModel->trashed()) {
+            return response()->json([
+                'message' => 'Only archived orders can be permanently deleted. Archive this order first.',
+            ], 422);
+        }
+
+        $orderModel->forceDelete();
+
         return response()->json(['message' => 'Order permanently deleted']);
     }
 }

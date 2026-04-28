@@ -1,0 +1,20 @@
+﻿node.exe : Retrieving projectΓÇª
+At C:\Users\sudo.santiago\AppData\Roaming\npm\vercel.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/vercel/dist/vc.js" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Retrieving projectΓÇª:String) [], 
+    RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+> Overwriting existing 
+C:\Xeta\transfer-export-20260426-railway-render\vercel_env_production.env file
+> Downloading `production` Environment Variables for 
+johnsantiago-6732s-projects/frontend
+Downloading
+
+Changes:
++ VERCEL_OIDC_TOKEN (Updated)
+
+Updated 
+C:\Xeta\transfer-export-20260426-railway-render\vercel_env_production.env file 
+ [415ms]

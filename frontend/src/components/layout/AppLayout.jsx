@@ -12,8 +12,8 @@ import {
 const adminCoreMenu = [
   { to: '/admin', label: 'Overview' },
   { to: '/admin/products', label: 'Products' },
+  { to: '/admin/promotions', label: 'Sales' },
   { to: '/admin/support', label: 'Support' },
-  { to: '/admin/notifications', label: 'Notifications' },
 ]
 
 const adminCommerceMenu = [

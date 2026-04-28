@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\PromotionEngineService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,35 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $promotionEngine = app(PromotionEngineService::class);
+        $saleSummary = $promotionEngine->getProductSaleSummary($this->resource);
+
+        $variants = $this->relationLoaded('variants')
+            ? $this->variants
+            : $this->variants()->active()->where('condition', 'new')->get();
+
+        $lowestSalePrice = null;
+        $lowestOriginalPrice = null;
+
+        foreach ($variants as $variant) {
+            $pricing = $promotionEngine->getVariantPricing($variant);
+
+            $salePrice = (float) ($pricing['unit_price'] ?? $variant->price ?? 0);
+            $originalPrice = (float) ($pricing['base_unit_price'] ?? $variant->price ?? 0);
+
+            if ($salePrice > 0) {
+                $lowestSalePrice = $lowestSalePrice === null
+                    ? $salePrice
+                    : min($lowestSalePrice, $salePrice);
+            }
+
+            if ($originalPrice > 0) {
+                $lowestOriginalPrice = $lowestOriginalPrice === null
+                    ? $originalPrice
+                    : min($lowestOriginalPrice, $originalPrice);
+            }
+        }
+
         return [
             'id' => $this->id,
             'name' => $this->normalizeDisplayText($this->name),
@@ -21,8 +51,12 @@ class ProductResource extends JsonResource
             'images' => ProductImageResource::collection($this->whenLoaded('images')),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
             'lowest_price' => $this->lowest_price,
+            'lowest_sale_price' => $lowestSalePrice,
+            'lowest_original_price' => $lowestOriginalPrice,
+            'sale' => $saleSummary,
             'average_rating' => $this->average_rating,
             'review_count' => $this->review_count,
+            'deleted_at' => $this->deleted_at,
             'primary_image' => $this->whenLoaded('images', function () {
                 $primary = $this->images->firstWhere('is_primary', true);
                 return $this->normalizeAssetUrl($primary ? $primary->url : $this->images->first()?->url);

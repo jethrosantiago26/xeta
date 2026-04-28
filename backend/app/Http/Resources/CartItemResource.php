@@ -11,6 +11,26 @@ class CartItemResource extends JsonResource
     {
         $variant = $this->variant;
         $product = $variant?->product;
+        $pricing = is_array($this->getAttribute('pricing')) ? $this->getAttribute('pricing') : [];
+        $baseUnitPrice = array_key_exists('base_unit_price', $pricing)
+            ? (float) $pricing['base_unit_price']
+            : ($variant ? (float) $variant->price : 0.0);
+        $unitPrice = array_key_exists('unit_price', $pricing)
+            ? (float) $pricing['unit_price']
+            : ($variant ? (float) $variant->price : 0.0);
+        $lineSubtotal = array_key_exists('line_subtotal', $pricing)
+            ? (float) $pricing['line_subtotal']
+            : round($baseUnitPrice * (int) $this->quantity, 2);
+        $lineDiscount = array_key_exists('line_discount', $pricing)
+            ? (float) $pricing['line_discount']
+            : max(0, round($lineSubtotal - ($unitPrice * (int) $this->quantity), 2));
+        $lineTotal = array_key_exists('line_total', $pricing)
+            ? (float) $pricing['line_total']
+            : round($unitPrice * (int) $this->quantity, 2);
+        $appliedPromotions = is_array($pricing['applied_promotions'] ?? null)
+            ? $pricing['applied_promotions']
+            : [];
+
         $productImage = $this->normalizeAssetUrl(
             $product?->images?->firstWhere('is_primary', true)?->url
                 ?? $product?->images?->first()?->url,
@@ -27,6 +47,8 @@ class CartItemResource extends JsonResource
             'id' => $this->id,
             'quantity' => $this->quantity,
             'variant' => new ProductVariantResource($this->whenLoaded('variant')),
+            'base_unit_price' => $baseUnitPrice,
+            'unit_price' => $unitPrice,
             'product' => [
                 'id' => $product?->id,
                 'name' => $this->normalizeDisplayText($product?->name),
@@ -36,7 +58,10 @@ class CartItemResource extends JsonResource
                 'image_url' => $productImage,
                 'images' => $productImages,
             ],
-            'line_total' => $variant ? (float) $variant->price * $this->quantity : 0,
+            'line_subtotal' => $lineSubtotal,
+            'line_discount' => $lineDiscount,
+            'line_total' => $lineTotal,
+            'applied_promotions' => $appliedPromotions,
         ];
     }
 

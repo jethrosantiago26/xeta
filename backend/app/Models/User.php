@@ -7,14 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
 use App\Models\SupportMessage;
 use App\Models\SupportTicket;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'clerk_id',
@@ -37,9 +36,6 @@ class User extends Authenticatable
         'location_source',
         'location_updated_at',
         'role',
-        'order_updates',
-        'security_alerts',
-        'marketing_emails',
     ];
 
     protected $hidden = [];
@@ -51,9 +47,6 @@ class User extends Authenticatable
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'location_updated_at' => 'datetime',
-            'order_updates' => 'boolean',
-            'security_alerts' => 'boolean',
-            'marketing_emails' => 'boolean',
         ];
     }
 
@@ -95,5 +88,10 @@ class User extends Authenticatable
     public function supportMessages(): HasMany
     {
         return $this->hasMany(SupportMessage::class);
+    }
+
+    public function promotionRedemptions(): HasMany
+    {
+        return $this->hasMany(PromotionRedemption::class);
     }
 }

@@ -1,0 +1,9 @@
+﻿node.exe : Fetching Domains under johnsantiago-6732s-projects
+At C:\Users\sudo.santiago\AppData\Roaming\npm\vercel.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/vercel/dist/vc.js" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Fetching Domain...-6732s-projects 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+> 0 Domains found under johnsantiago-6732s-projects [281ms]

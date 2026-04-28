@@ -23,11 +23,20 @@ class CartController extends Controller
     {
         $user = $request->user();
         $items = $this->cartService->getCart($user);
-        $totals = $this->cartService->calculateTotals($user);
+        $calculation = $this->cartService->calculateDetailedCart(
+            $user,
+            $items,
+        );
+
+        $pricingByItemId = collect($calculation['items'])->keyBy('cart_item_id');
+        $items->each(function ($item) use ($pricingByItemId): void {
+            $item->setAttribute('pricing', $pricingByItemId->get($item->id));
+        });
 
         return response()->json([
             'items' => CartItemResource::collection($items),
-            'totals' => $totals,
+            'totals' => $calculation['totals'],
+            'promotions' => $calculation['applied_promotions'],
         ]);
     }
 

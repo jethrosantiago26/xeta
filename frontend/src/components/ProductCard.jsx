@@ -7,6 +7,10 @@ import { formatMoney } from '../lib/format.js'
 import { normalizeDisplayText, resolveProductImage } from '../lib/orderItemMedia.js'
 import { getVariantVisual } from '../lib/variantVisuals.js'
 
+function resolveVariantFinalPrice(variant) {
+  return Number(variant?.sale_price ?? variant?.final_price ?? variant?.price ?? 0)
+}
+
 function ProductCard({
   product,
   prioritizeImage = false,
@@ -20,7 +24,7 @@ function ProductCard({
   const { isWishlisted, toggleItem } = useWishlist()
 
   const visualVariants = useMemo(() => {
-    const sortedVariants = [...(product.variants ?? [])].sort((left, right) => Number(left.price) - Number(right.price))
+    const sortedVariants = [...(product.variants ?? [])].sort((left, right) => resolveVariantFinalPrice(left) - resolveVariantFinalPrice(right))
 
     return sortedVariants.map((variant, index) => ({
       ...variant,
@@ -54,7 +58,21 @@ function ProductCard({
   const image = resolveProductImage(product, { variant: selectedVariant })
   const productName = normalizeDisplayText(product.name) || 'Product'
   const selectedVariantName = normalizeDisplayText(selectedVariant?.name) || 'Standard variant'
-  const price = selectedVariant?.price ?? product.lowest_price ?? product.variants?.[0]?.price ?? 0
+  const selectedVariantPrice = resolveVariantFinalPrice(selectedVariant)
+  const fallbackLowestPrice = Number(
+    product.lowest_sale_price
+    ?? product.lowest_price
+    ?? product.variants?.[0]?.sale_price
+    ?? product.variants?.[0]?.price
+    ?? 0,
+  )
+  const price = selectedVariant ? selectedVariantPrice : fallbackLowestPrice
+  const baselinePrice = Number(selectedVariant?.price ?? product.lowest_original_price ?? product.lowest_price ?? price)
+  const compareAtPrice = Number(selectedVariant?.compare_at_price ?? 0)
+  const originalPrice = compareAtPrice > baselinePrice ? compareAtPrice : baselinePrice
+  const hasSalePricing = originalPrice > price && price > 0
+  const computedSalePercent = hasSalePricing ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0
+  const saleLabel = selectedVariant?.sale_label || product.sale?.label || (computedSalePercent > 0 ? `${computedSalePercent}% OFF` : null)
   const reviewCount = Number(product.review_count ?? 0)
   const reviewLabel = reviewCount === 1 ? '1 review' : `${reviewCount} reviews`
   const averageRatingValue = Number(product.average_rating)
@@ -67,6 +85,7 @@ function ProductCard({
     : price > 0
       ? `from ${formatMoney(price)}`
       : 'See options'
+  const originalPriceLabel = hasSalePricing ? formatMoney(originalPrice) : null
   const feedbackMessage = actionError || actionMessage
   const inWishlist = isWishlisted(product)
   const wishlistLabel = inWishlist ? 'Remove from wishlist' : 'Save to wishlist'
@@ -530,7 +549,11 @@ function ProductCard({
             </p>
 
             <div className="row product-card-row-price-row" style={{ justifyContent: 'space-between' }}>
-              <strong className="price">{priceLabel}</strong>
+              <div style={{ display: 'grid', gap: '2px' }}>
+                <strong className="price">{priceLabel}</strong>
+                {originalPriceLabel ? <span className="product-card-price-original">{originalPriceLabel}</span> : null}
+              </div>
+              {saleLabel ? <span className="status-pill success product-card-sale-pill">{saleLabel}</span> : null}
               {selectedVariant ? (
                 <span className="product-card-row-variant-label">{selectedVariantName}</span>
               ) : null}
@@ -551,7 +574,7 @@ function ProductCard({
                         type="button"
                         role="radio"
                         aria-checked={isActive}
-                        aria-label={`${variantName} ${formatMoney(variant.price)}`}
+                        aria-label={`${variantName} ${formatMoney(resolveVariantFinalPrice(variant))}`}
                         className={`product-card-meatball${isActive ? ' active' : ''}`}
                         style={{
                           '--variant-color': variant.visual.color,
@@ -669,6 +692,7 @@ function ProductCard({
             </div>
           ) : null}
           <h2 style={{ fontSize: '13px', lineHeight: 1.35 }}>{productName}</h2>
+          {saleLabel ? <span className="status-pill success product-card-sale-pill">{saleLabel}</span> : null}
           {showDescription ? (
             <p className="muted" style={{ fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {product.description?.slice(0, 100) || 'High quality peripherals for work and play.'}
@@ -687,7 +711,7 @@ function ProductCard({
                       type="button"
                       role="radio"
                       aria-checked={isActive}
-                      aria-label={`${variantName} ${formatMoney(variant.price)}`}
+                      aria-label={`${variantName} ${formatMoney(resolveVariantFinalPrice(variant))}`}
                       className={`product-card-meatball${isActive ? ' active' : ''}`}
                       style={{
                         '--variant-color': variant.visual.color,
@@ -704,7 +728,10 @@ function ProductCard({
             )}
           </div>
           <div className="row product-card-price-row" style={{ justifyContent: 'space-between' }}>
-            <strong className="price">{priceLabel}</strong>
+            <div style={{ display: 'grid', gap: '2px' }}>
+              <strong className="price">{priceLabel}</strong>
+              {originalPriceLabel ? <span className="product-card-price-original">{originalPriceLabel}</span> : null}
+            </div>
           </div>
           <div className="product-card-actions">
             <button

@@ -1,0 +1,23 @@
+﻿node.exe : Fetching projects in johnsantiago-6732s-projects
+At C:\Users\sudo.santiago\AppData\Roaming\npm\vercel.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/vercel/dist/vc.js" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Fetching projec...-6732s-projects 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+> Projects found under johnsantiago-6732s-projects  [3s]
+
+  Project Name                    Latest Production URL                        
+            Updated   Node Version   
+  frontend                        https://xeta-commerce.vercel.app             
+            6h        24.x           
+  smartstock                      https://smartstock-sepia.vercel.app          
+            14d       24.x           
+  portfolio                       
+https://portfolio-eta-nine-zcc426engn.vercel.app         87d       24.x        
+   
+  v0-portfolio-profile-creation   
+https://v0-portfolio-profile-creation-sigma.vercel.app   94d       24.x        
+   
+

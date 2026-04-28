@@ -1,31 +1,56 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { addCartItem, getCart, removeCartItem, updateCartItem } from '../lib/api.js'
 import { useSession } from './SessionContext.jsx'
 
 const CartContext = createContext(null)
 const REFRESH_INTERVAL_MS = 10000
+const EMPTY_TOTALS = {
+  subtotal: 0,
+  item_discount: 0,
+  order_discount: 0,
+  discount_total: 0,
+  tax: 0,
+  shipping: 0,
+  total: 0,
+}
+const EMPTY_PROMOTIONS = { items: [], order: [] }
 
 function normalizeCart(payload) {
   if (!payload) {
-    return { items: [], totals: { subtotal: 0, tax: 0, shipping: 0, total: 0 } }
+    return {
+      items: [],
+      totals: EMPTY_TOTALS,
+      promotions: EMPTY_PROMOTIONS,
+    }
   }
 
   const items = payload.items?.data ?? payload.items ?? []
-  const totals = payload.totals ?? { subtotal: 0, tax: 0, shipping: 0, total: 0 }
+  const totals = {
+    ...EMPTY_TOTALS,
+    ...(payload.totals ?? {}),
+  }
+  const promotions = {
+    ...EMPTY_PROMOTIONS,
+    ...(payload.promotions ?? {}),
+  }
 
-  return { items, totals }
+  return { items, totals, promotions }
 }
 
 export function CartProvider({ children }) {
   const { profile, isLoaded, isSignedIn, loading: sessionLoading } = useSession()
   const [items, setItems] = useState([])
-  const [totals, setTotals] = useState({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
+  const [totals, setTotals] = useState(EMPTY_TOTALS)
+  const [promotions, setPromotions] = useState(EMPTY_PROMOTIONS)
   const [loading, setLoading] = useState(false)
 
   const refreshCart = useCallback(async ({ background = false } = {}) => {
+
     if (!isSignedIn || !profile || profile.role === 'admin') {
       setItems([])
-      setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
+      setTotals(EMPTY_TOTALS)
+      setPromotions(EMPTY_PROMOTIONS)
       return
     }
 
@@ -38,10 +63,12 @@ export function CartProvider({ children }) {
       const cart = normalizeCart(response.data)
       setItems(cart.items)
       setTotals(cart.totals)
+      setPromotions(cart.promotions)
     } catch {
       if (!background) {
         setItems([])
-        setTotals({ subtotal: 0, tax: 0, shipping: 0, total: 0 })
+        setTotals(EMPTY_TOTALS)
+        setPromotions(EMPTY_PROMOTIONS)
       }
     } finally {
       if (!background) {
@@ -97,6 +124,7 @@ export function CartProvider({ children }) {
       await removeCartItem(cartItemId)
       await refreshCart()
     },
+    promotions,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

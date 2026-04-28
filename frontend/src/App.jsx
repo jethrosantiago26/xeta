@@ -20,7 +20,7 @@ const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage.jsx'))
 const AdminCustomersPage = lazy(() => import('./pages/AdminCustomersPage.jsx'))
 const AdminInventoryPage = lazy(() => import('./pages/AdminInventoryPage.jsx'))
 const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage.jsx'))
-const AdminNotificationsPage = lazy(() => import('./pages/AdminNotificationsPage.jsx'))
+const AdminPromotionsPage = lazy(() => import('./pages/AdminPromotionsPage.jsx'))
 const CartPage = lazy(() => import('./pages/CartPage.jsx'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage.jsx'))
 const FaqPage = lazy(() => import('./pages/FaqPage.jsx'))
@@ -312,10 +312,18 @@ function App({ clerkReady }) {
                   }
                 />
                 <Route
-                  path="admin/notifications"
+                  path="admin/promotions"
                   element={
                     <ProtectedRoute requireAdmin>
-                      <AdminNotificationsPage />
+                      <AdminPromotionsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="admin/sales"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminPromotionsPage />
                     </ProtectedRoute>
                   }
                 />

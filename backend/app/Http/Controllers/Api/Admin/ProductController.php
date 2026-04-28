@@ -19,7 +19,10 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToWriteFile;
 
 class ProductController extends Controller
 {
@@ -61,17 +64,11 @@ class ProductController extends Controller
         $product = Product::create($validated);
 
         if ($request->hasFile('image')) {
-            $storedPath = Storage::disk('public')->putFile('products', $request->file('image'));
-
-            if (!$storedPath) {
-                throw ValidationException::withMessages([
-                    'image' => ['Unable to store the uploaded image. Please try again.'],
-                ]);
-            }
+            $imageUrl = $this->storeProductImage($request->file('image'));
 
             ProductImage::create([
                 'product_id' => $product->id,
-                'url' => '/storage/' . ltrim(str_replace('\\', '/', $storedPath), '/'),
+                'url' => $imageUrl,
                 'alt_text' => $product->name,
                 'sort_order' => 0,
                 'is_primary' => true,
@@ -132,7 +129,20 @@ class ProductController extends Controller
      */
     public function forceDelete(int $product): JsonResponse
     {
-        $productModel = Product::withTrashed()->findOrFail($product);
+        $productModel = Product::withTrashed()
+            ->with([
+                'images',
+                'variants' => fn ($query) => $query->withTrashed(),
+            ])
+            ->findOrFail($product);
+
+        if (!$productModel->trashed()) {
+            return response()->json([
+                'message' => 'Only archived products can be permanently deleted. Archive the product first.',
+            ], 422);
+        }
+
+        $this->cleanupProductAttachments($productModel);
         $productModel->forceDelete();
         $this->invalidateCatalogCaches();
 
@@ -154,10 +164,9 @@ class ProductController extends Controller
         }
 
         $payload['condition'] = 'new';
-        $payload['attributes'] = $this->variantVisualService->buildAttributes($productModel, $payload);
+        $payload['attributes'] = $this->variantVisualService->buildAttributes($payload);
 
         $variant = $productModel->variants()->create($payload);
-        $this->syncProductVariantPrices($productModel, (float) $variant->price);
         $variant->refresh();
         $this->invalidateCatalogCaches();
 
@@ -185,9 +194,26 @@ class ProductController extends Controller
         ]);
 
         $variantModel = ProductVariant::where('product_id', $product)->findOrFail($variant);
-        $productModel = Product::findOrFail($product);
-
+        $previousImageUrl = $this->extractVariantImageUrl($variantModel);
         unset($validated['image']);
+
+        // Log upload attempt metadata (best-effort, avoid logging sensitive token values)
+        try {
+            $file = $request->file('image');
+            if ($file) {
+                Log::info('Admin variant image upload attempt', [
+                    'product_id' => $product,
+                    'variant_id' => $variant,
+                    'has_authorization_header' => (bool) $request->header('Authorization'),
+                    'client_ip' => $request->ip(),
+                    'file_name' => $file->getClientOriginalName(),
+                    'file_size' => $file->getSize(),
+                    'file_mime' => $file->getClientMimeType(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to record upload attempt metadata', ['exception' => $e->getMessage()]);
+        }
 
         if ($request->hasFile('image')) {
             $validated['attributes'] = is_array($validated['attributes'] ?? null) ? $validated['attributes'] : [];
@@ -195,20 +221,46 @@ class ProductController extends Controller
         }
 
         $validated['attributes'] = $this->variantVisualService->buildAttributes(
-            $productModel,
             $validated,
             $variantModel,
         );
         $validated['condition'] = 'new';
 
+        // Log pre-update state for debugging
+        try {
+            Log::info('Variant pre-update state', [
+                'variant_id' => $variant,
+                'previous_image_url' => $previousImageUrl,
+                'incoming_attributes' => $validated['attributes'] ?? [],
+                'incoming_name' => $validated['name'] ?? null,
+                'incoming_price' => $validated['price'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            // Non-fatal
+        }
+
         $variantModel->update($validated);
-
-        $targetPrice = array_key_exists('price', $validated)
-            ? (float) $validated['price']
-            : (float) $variantModel->price;
-
-        $this->syncProductVariantPrices($productModel, $targetPrice);
         $variantModel->refresh();
+
+        // Log post-update state for debugging
+        try {
+            $storedImageUrl = $this->extractVariantImageUrl($variantModel);
+            Log::info('Variant post-update state', [
+                'variant_id' => $variant,
+                'stored_attributes' => $variantModel->attributes ?? [],
+                'stored_image_url' => $storedImageUrl,
+                'stored_name' => $variantModel->name,
+                'stored_price' => $variantModel->price,
+            ]);
+        } catch (\Throwable $e) {
+            // Non-fatal
+        }
+
+        $this->cleanupVariantAttachmentIfChanged(
+            $previousImageUrl,
+            $this->extractVariantImageUrl($variantModel),
+        );
+
         $this->invalidateCatalogCaches();
 
         return response()->json([
@@ -222,7 +274,11 @@ class ProductController extends Controller
      */
     public function destroyVariant(int $product, int $variant): JsonResponse
     {
-        ProductVariant::where('product_id', $product)->findOrFail($variant)->delete();
+        $variantModel = ProductVariant::where('product_id', $product)->findOrFail($variant);
+
+        $this->cleanupVariantAttachment($variantModel);
+        $variantModel->delete();
+
         $this->invalidateCatalogCaches();
 
         return response()->json(['message' => 'Variant deleted']);
@@ -234,23 +290,267 @@ class ProductController extends Controller
         $this->productService->bumpProductListCacheVersion();
     }
 
+    private function storeProductImage(UploadedFile $image): string
+    {
+        $directory = trim((string) config('products.attachments_directory', 'products'), '/');
+
+        return $this->storeAttachment($image, $directory !== '' ? $directory : 'products');
+    }
+
     private function storeVariantImage(UploadedFile $image): string
     {
-        $storedPath = Storage::disk('public')->putFile('variants', $image);
+        $directory = trim((string) config('products.variant_attachments_directory', 'product-variants'), '/');
 
-        if (!$storedPath) {
+        return $this->storeAttachment($image, $directory !== '' ? $directory : 'product-variants');
+    }
+
+    private function storeAttachment(UploadedFile $file, string $directory): string
+    {
+        $diskName = $this->resolveAttachmentDisk();
+
+        // Log attempt metadata (best-effort)
+        try {
+            Log::info('Attempting to store product attachment', [
+                'disk' => $diskName,
+                'directory' => $directory,
+                'file_name' => $file->getClientOriginalName(),
+                'file_size' => $file->getSize(),
+                'file_mime' => $file->getClientMimeType(),
+            ]);
+        } catch (\Throwable $e) {
+            // Non-fatal
+        }
+
+        try {
+            $storedPath = Storage::disk($diskName)->putFile($directory, $file);
+        } catch (\Throwable $exception) {
+            $errorId = uniqid('img_', true);
+
+            Log::error('Failed to store product attachment', [
+                'error_id' => $errorId,
+                'disk' => $diskName,
+                'directory' => $directory,
+                'file_name' => $file->getClientOriginalName() ?? null,
+                'file_size' => $file->getSize() ?? null,
+                'exception' => $exception instanceof \Throwable ? $exception->getMessage() : (string) $exception,
+            ]);
+
             throw ValidationException::withMessages([
-                'image' => ['Unable to store the uploaded image. Please try again.'],
+                'image' => ['Image storage is temporarily unavailable. Please try again in a moment.'],
+                'error_id' => [$errorId],
             ]);
         }
 
-        return '/storage/' . ltrim(str_replace('\\', '/', $storedPath), '/');
+        if (!$storedPath) {
+            $errorId = uniqid('img_', true);
+
+            Log::error('Failed to store product attachment - no path returned', [
+                'error_id' => $errorId,
+                'disk' => $diskName,
+                'directory' => $directory,
+                'file_name' => $file->getClientOriginalName() ?? null,
+                'file_size' => $file->getSize() ?? null,
+            ]);
+
+            throw ValidationException::withMessages([
+                'image' => ['Unable to store the uploaded image. Please try again.'],
+                'error_id' => [$errorId],
+            ]);
+        }
+
+        // Log successful storage for easier tracing in logs (do not expose full paths publicly)
+        try {
+            Log::info('Stored product attachment', [
+                'disk' => $diskName,
+                'path' => $storedPath,
+            ]);
+        } catch (\Throwable $e) {
+            // Non-fatal: logging should not break upload flow
+        }
+
+        return $this->resolveAttachmentUrl($diskName, $storedPath);
     }
 
-    private function syncProductVariantPrices(Product $productModel, float $price): void
+    private function resolveAttachmentDisk(): string
     {
-        $normalizedPrice = round($price, 2);
+        $configured = trim((string) config('products.attachments_disk', 'public'));
+        $diskName = $configured !== '' ? $configured : 'public';
 
-        $productModel->variants()->update(['price' => $normalizedPrice]);
+        if ($diskName === 'local') {
+            $diskName = 'public';
+        }
+
+        if (!is_array(config("filesystems.disks.{$diskName}"))) {
+            return 'public';
+        }
+
+        return $diskName;
+    }
+
+    private function resolveAttachmentUrl(string $diskName, string $path): string
+    {
+        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
+
+        if ($diskName === 'public') {
+            return '/storage/' . $normalizedPath;
+        }
+
+        $diskUrl = rtrim((string) config("filesystems.disks.{$diskName}.url", ''), '/');
+
+        if ($diskUrl !== '') {
+            return $diskUrl . '/' . $normalizedPath;
+        }
+
+        return '/storage/' . $normalizedPath;
+    }
+
+    private function cleanupProductAttachments(Product $productModel): void
+    {
+        foreach ($productModel->images as $image) {
+            $this->deleteAttachmentByUrl((string) ($image->url ?? ''));
+        }
+
+        foreach ($productModel->variants as $variant) {
+            $this->cleanupVariantAttachment($variant);
+        }
+    }
+
+    private function cleanupVariantAttachment(ProductVariant $variant): void
+    {
+        $imageUrl = $this->extractVariantImageUrl($variant);
+
+        if ($imageUrl === '') {
+            return;
+        }
+
+        $this->deleteAttachmentByUrl($imageUrl);
+    }
+
+    private function cleanupVariantAttachmentIfChanged(string $previousImageUrl, string $nextImageUrl): void
+    {
+        if ($previousImageUrl === '') {
+            return;
+        }
+
+        if ($this->normalizeComparableAttachmentUrl($previousImageUrl) === $this->normalizeComparableAttachmentUrl($nextImageUrl)) {
+            return;
+        }
+
+        $this->deleteAttachmentByUrl($previousImageUrl);
+    }
+
+    private function extractVariantImageUrl(ProductVariant $variant): string
+    {
+        $attributes = is_array($variant->attributes) ? $variant->attributes : [];
+
+        return trim((string) ($attributes['image_url'] ?? ''));
+    }
+
+    private function deleteAttachmentByUrl(string $url): void
+    {
+        $trimmedUrl = trim($url);
+
+        if ($trimmedUrl === '') {
+            return;
+        }
+
+        $preferredDisk = $this->resolveAttachmentDisk();
+        $diskCandidates = array_values(array_unique([$preferredDisk, 'public']));
+
+        foreach ($diskCandidates as $diskName) {
+            if (!is_array(config("filesystems.disks.{$diskName}"))) {
+                continue;
+            }
+
+            $relativePath = $this->extractRelativeAttachmentPath($trimmedUrl, $diskName);
+
+            if ($relativePath === '') {
+                continue;
+            }
+
+            try {
+                $disk = Storage::disk($diskName);
+
+                if ($disk->exists($relativePath)) {
+                    $disk->delete($relativePath);
+                    return;
+                }
+            } catch (\Throwable) {
+                // Best-effort cleanup; do not block the deletion flow.
+            }
+        }
+    }
+
+    private function extractRelativeAttachmentPath(string $url, string $diskName): string
+    {
+        $value = trim(str_replace('\\', '/', $url));
+
+        if ($value === '' || str_starts_with($value, 'data:') || str_starts_with($value, 'blob:')) {
+            return '';
+        }
+
+        $diskUrl = rtrim((string) config("filesystems.disks.{$diskName}.url", ''), '/');
+
+        if ($diskUrl !== '' && str_starts_with($value, $diskUrl . '/')) {
+            return ltrim(substr($value, strlen($diskUrl)), '/');
+        }
+
+        $isAbsoluteUrl = preg_match('/^(https?:)?\/\//i', $value) === 1;
+
+        if ($isAbsoluteUrl) {
+            $parsedPath = parse_url($value, PHP_URL_PATH);
+
+            if (!is_string($parsedPath) || $parsedPath === '') {
+                return '';
+            }
+
+            $value = $parsedPath;
+        }
+
+        if (str_starts_with($value, '/storage/')) {
+            return ltrim(substr($value, strlen('/storage/')), '/');
+        }
+
+        if (str_starts_with($value, 'storage/')) {
+            return ltrim(substr($value, strlen('storage/')), '/');
+        }
+
+        if (str_starts_with($value, '/uploads/')) {
+            return ltrim(substr($value, strlen('/uploads/')), '/');
+        }
+
+        if (str_starts_with($value, 'uploads/')) {
+            return ltrim(substr($value, strlen('uploads/')), '/');
+        }
+
+        if ($isAbsoluteUrl && $diskUrl !== '') {
+            return '';
+        }
+
+        return ltrim($value, '/');
+    }
+
+    private function normalizeComparableAttachmentUrl(string $url): string
+    {
+        $value = trim(str_replace('\\', '/', $url));
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (preg_match('/^(https?:)?\/\//i', $value) === 1) {
+            $parsedPath = parse_url($value, PHP_URL_PATH);
+            $value = is_string($parsedPath) ? $parsedPath : $value;
+        }
+
+        if (str_starts_with($value, '/uploads/')) {
+            $value = '/storage/' . ltrim(substr($value, strlen('/uploads/')), '/');
+        } elseif (str_starts_with($value, 'uploads/')) {
+            $value = '/storage/' . ltrim(substr($value, strlen('uploads/')), '/');
+        } elseif (!str_starts_with($value, '/')) {
+            $value = '/' . ltrim($value, '/');
+        }
+
+        return rtrim($value, '/');
     }
 }

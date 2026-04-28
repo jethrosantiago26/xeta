@@ -125,8 +125,34 @@ function CheckoutPage() {
         <div className="summary-card">
           <h3>Order total</h3>
           <div className="divider" />
-          <p className="price">{formatMoney(totals.total)}</p>
-          <p className="muted">Shipping is calculated by the server.</p>
+          <div className="stack" style={{ gap: '8px' }}>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted">Subtotal</span>
+              <span>{formatMoney(totals.subtotal)}</span>
+            </div>
+            {Number(totals.item_discount ?? 0) > 0 ? (
+              <div className="row" style={{ justifyContent: 'space-between', color: 'var(--color-success-text)' }}>
+                <span>Item discounts</span>
+                <span>-{formatMoney(totals.item_discount)}</span>
+              </div>
+            ) : null}
+            {Number(totals.order_discount ?? 0) > 0 ? (
+              <div className="row" style={{ justifyContent: 'space-between', color: 'var(--color-success-text)' }}>
+                <span>Additional discount</span>
+                <span>-{formatMoney(totals.order_discount)}</span>
+              </div>
+            ) : null}
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="muted">Shipping</span>
+              <span>{totals.shipping === 0 ? 'Free' : formatMoney(totals.shipping)}</span>
+            </div>
+            <div className="divider" />
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontWeight: 600 }}>Total</span>
+              <p className="price" style={{ margin: 0 }}>{formatMoney(totals.total)}</p>
+            </div>
+          </div>
+          <p className="muted">Shipping and discounts are computed by the server in real time.</p>
           <p className="caption">Items in cart: {items.length}</p>
         </div>
         <div className="summary-card">

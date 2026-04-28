@@ -33,45 +33,11 @@ function parseCoordinate(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-const defaultSettings = {
-  order_updates: true,
-  security_alerts: true,
-  marketing_emails: false,
-  profile_visibility: 'private',
-}
-
 function AccountPage() {
   const { theme, setTheme, toggleTheme } = useTheme()
   const { profile, refreshProfile } = useSession()
   const isAdmin = profile?.role === 'admin'
   const [activeTab, setActiveTab] = useState('profile')
-
-  const [settings, setSettings] = useState(defaultSettings)
-  const [settingsSaving, setSettingsSaving] = useState(false)
-  const [settingsMessage, setSettingsMessage] = useState('')
-  const [settingsError, setSettingsError] = useState('')
-
-  async function handleSaveSettings() {
-    setSettingsSaving(true)
-    setSettingsError('')
-    setSettingsMessage('')
-
-    try {
-      await updateProfile({
-        order_updates: settings.order_updates,
-        security_alerts: settings.security_alerts,
-        marketing_emails: settings.marketing_emails,
-      })
-
-      await refreshProfile()
-      setSettingsMessage('Settings saved.')
-      setTimeout(() => setSettingsMessage(''), 3000)
-    } catch (saveError) {
-      setSettingsError(extractRequestError(saveError, 'Notification settings could not be saved right now.'))
-    } finally {
-      setSettingsSaving(false)
-    }
-  }
 
   const [loading, setLoading] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
@@ -102,13 +68,6 @@ function AccountPage() {
     if (!profile) {
       return
     }
-
-    setSettings({
-      ...defaultSettings,
-      order_updates: profile.order_updates ?? defaultSettings.order_updates,
-      security_alerts: profile.security_alerts ?? defaultSettings.security_alerts,
-      marketing_emails: profile.marketing_emails ?? defaultSettings.marketing_emails,
-    })
 
     setForm({
       first_name: profile.first_name ?? '',
@@ -330,7 +289,7 @@ function AccountPage() {
                 fontWeight: 600, fontSize: '0.9rem'
               }}
             >
-              Preferences & Settings
+              Preferences
             </button>
           ) : null}
         </div>
@@ -536,43 +495,6 @@ function AccountPage() {
                 </button>
               </div>
             </article>
-
-            <article className="content-card settings-card">
-              <h3>Notifications</h3>
-              <div className="stack" style={{ gap: '10px' }}>
-                <label className="settings-check">
-                  <input
-                    type="checkbox"
-                    checked={settings.order_updates}
-                    onChange={(event) => setSettings({ ...settings, order_updates: event.target.checked })}
-                  />
-                  <span>Order updates</span>
-                </label>
-                <label className="settings-check">
-                  <input
-                    type="checkbox"
-                    checked={settings.security_alerts}
-                    onChange={(event) => setSettings({ ...settings, security_alerts: event.target.checked })}
-                  />
-                  <span>Security alerts</span>
-                </label>
-                <label className="settings-check">
-                  <input
-                    type="checkbox"
-                    checked={settings.marketing_emails}
-                    onChange={(event) => setSettings({ ...settings, marketing_emails: event.target.checked })}
-                  />
-                  <span>Marketing emails</span>
-                </label>
-              </div>
-            </article>
-            <section className="content-card settings-actions">
-              <button type="button" className="button button-primary" onClick={handleSaveSettings} disabled={settingsSaving}>
-                {settingsSaving ? 'Saving settings...' : 'Save settings'}
-              </button>
-              {settingsMessage ? <div className="notice success">{settingsMessage}</div> : null}
-              {settingsError ? <div className="notice error">{settingsError}</div> : null}
-            </section>
           </div>
         )}
       </section>

@@ -9,13 +9,21 @@ use Illuminate\Support\Collection;
 
 class CartService
 {
+    public function __construct(
+        private readonly PromotionEngineService $promotionEngineService,
+    ) {
+    }
+
     /**
      * Get all cart items for a user with loaded relationships.
      */
     public function getCart(User $user): Collection
     {
         return $user->cartItems()
-            ->with(['variant.product.images' => fn ($q) => $q->where('is_primary', true)])
+            ->with([
+                'variant.product.category',
+                'variant.product.images' => fn ($q) => $q->where('is_primary', true),
+            ])
             ->get();
     }
 
@@ -100,21 +108,19 @@ class CartService
     /**
      * Calculate cart totals.
      */
-    public function calculateTotals(User $user): array
+    public function calculateTotals(User $user, ?Collection $items = null): array
     {
-        $items = $this->getCart($user);
+        return $this->calculateDetailedCart($user, $items)['totals'];
+    }
 
-        $subtotal = $items->sum(fn (CartItem $item) => $item->variant->price * $item->quantity);
-        $tax = 0.0;
-        $shipping = $subtotal >= 100 ? 0 : 9.99; // Free shipping over $100
+    /**
+     * Calculate cart totals and detailed promotion breakdowns.
+     */
+    public function calculateDetailedCart(User $user, ?Collection $items = null): array
+    {
+        $cartItems = $items ?? $this->getCart($user);
 
-        return [
-            'subtotal' => round($subtotal, 2),
-            'tax' => $tax,
-            'shipping' => $shipping,
-            'total' => round($subtotal + $shipping, 2),
-            'item_count' => $items->sum('quantity'),
-        ];
+        return $this->promotionEngineService->calculateCart($user, $cartItems);
     }
 
     private function validateStock(ProductVariant $variant, int $quantity): void

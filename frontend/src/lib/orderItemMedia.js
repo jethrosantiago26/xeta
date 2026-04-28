@@ -59,9 +59,10 @@ function collectProductImageCandidates(product, preferredVariant = null) {
       preferredVariant?.attributes?.image_url,
       preferredVariant?.attributes?.image,
       preferredVariant?.attributes?.preview_image,
-      preferredVariant?.visual?.image,
     ]
     : []
+
+  const selectedVariantVisualFallback = preferredVariant?.visual?.image || null
 
   const variantCandidates = variants.flatMap((variant) => [
     variant?.image_url,
@@ -82,6 +83,7 @@ function collectProductImageCandidates(product, preferredVariant = null) {
     product?.image_url,
     product?.image,
     ...productGallery,
+    selectedVariantVisualFallback,
   ]
 
   return Array.from(new Set(dedupeList.filter(Boolean)))

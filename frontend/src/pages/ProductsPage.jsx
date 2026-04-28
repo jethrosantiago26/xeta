@@ -46,8 +46,8 @@ function normalizePriceBounds(meta, products = []) {
 
   const prices = products
     .flatMap((product) => [
-      Number(product.lowest_price),
-      ...(product.variants ?? []).map((variant) => Number(variant.price)),
+      Number(product.lowest_sale_price ?? product.lowest_price),
+      ...(product.variants ?? []).map((variant) => Number(variant.sale_price ?? variant.price)),
     ])
     .filter((price) => Number.isFinite(price) && price >= 0)
 

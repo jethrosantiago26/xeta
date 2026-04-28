@@ -10,7 +10,7 @@ import {
   readResource 
 } from '../lib/api.js'
 import { formatMoney } from '../lib/format.js'
-import { Trash2, Edit3, RotateCcw, AlertTriangle, Users, Search } from 'lucide-react'
+import { Archive, Edit3, RotateCcw, AlertTriangle, Users, Search } from 'lucide-react'
 
 const CUSTOMER_TABS = [
   { key: 'all', label: 'All Customers' },
@@ -18,11 +18,29 @@ const CUSTOMER_TABS = [
   { key: 'vip', label: 'Top Spenders' },
 ]
 
+function extractCollectionTotal(payload) {
+  const total = Number(
+    payload?.data?.meta?.total
+    ?? payload?.meta?.total
+    ?? payload?.data?.total
+    ?? payload?.total,
+  )
+
+  if (Number.isFinite(total)) {
+    return total
+  }
+
+  const rows = payload?.data?.data ?? payload?.data ?? []
+  return Array.isArray(rows) ? rows.length : 0
+}
+
 function AdminCustomersPage() {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [withArchived, setWithArchived] = useState(false)
+  const [archivedOnly, setArchivedOnly] = useState(false)
+  const [customerCounts, setCustomerCounts] = useState({ active: 0, archived: 0 })
+  const [countsReady, setCountsReady] = useState(false)
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState('all')
   
@@ -33,26 +51,46 @@ function AdminCustomersPage() {
     setLoading(true)
     setError('')
     try {
-      const response = await getAdminCustomers({ per_page: 100, with_archived: withArchived ? 1 : 0 })
+      const [response, activeCountResponse, allCountResponse] = await Promise.all([
+        getAdminCustomers({ per_page: 100, with_archived: 1 }),
+        getAdminCustomers({ per_page: 1, with_archived: 0 }),
+        getAdminCustomers({ per_page: 1, with_archived: 1 }),
+      ])
+
       const payload = readResource(response)
+      const activeCountPayload = readResource(activeCountResponse)
+      const allCountPayload = readResource(allCountResponse)
+
       setCustomers(Array.isArray(payload?.data) ? payload.data : [])
+
+      const activeCount = extractCollectionTotal(activeCountPayload)
+      const allCount = extractCollectionTotal(allCountPayload)
+
+      setCustomerCounts({
+        active: activeCount,
+        archived: Math.max(0, allCount - activeCount),
+      })
+      setCountsReady(true)
     } catch {
       setError('Failed to load customers.')
+      setCountsReady(false)
     } finally {
       setLoading(false)
     }
-  }, [withArchived])
+  }, [])
 
   useEffect(() => { loadCustomers() }, [loadCustomers])
 
   const filteredCustomers = useMemo(() => {
-    let results = [...customers]
+    let results = customers.filter((customer) => (archivedOnly ? !!customer.deleted_at : !customer.deleted_at))
 
     // Tab filtering
-    if (activeTab === 'active') {
-      results = results.filter(c => (c.orders_count || 0) > 0)
-    } else if (activeTab === 'vip') {
-      results = results.filter(c => (c.orders_sum_total || 0) > 1000)
+    if (!archivedOnly) {
+      if (activeTab === 'active') {
+        results = results.filter(c => (c.orders_count || 0) > 0)
+      } else if (activeTab === 'vip') {
+        results = results.filter(c => (c.orders_sum_total || 0) > 1000)
+      }
     }
 
     // Search
@@ -66,7 +104,7 @@ function AdminCustomersPage() {
     }
 
     return results
-  }, [customers, activeTab, search])
+  }, [customers, archivedOnly, activeTab, search])
 
   async function handleArchive(id, isArchived) {
     if (!window.confirm(`Are you sure you want to ${isArchived ? 'restore' : 'archive'} this customer?`)) return
@@ -103,37 +141,65 @@ function AdminCustomersPage() {
   }
 
   return (
-    <div className="page-grid">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+    <div className="page-grid admin-customers-page">
+      <div className="admin-page-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <PageHeader
           eyebrow="Commerce"
           title="Customers"
           description="Manage user profiles, view purchase history, and handle account status."
         />
-        <label className="admin-archive-toggle">
-          <input
-            type="checkbox"
-            checked={withArchived}
-            onChange={(e) => { setWithArchived(e.target.checked); setActiveTab('all') }}
-          />
-          Show Archived
-        </label>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="pipeline-tabs" role="tablist" aria-label="Customer list view mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!archivedOnly}
+              className={`pipeline-tab${!archivedOnly ? ' active' : ''}`}
+              onClick={() => {
+                setArchivedOnly(false)
+                setActiveTab('all')
+              }}
+            >
+              Active
+              <span className={`pipeline-tab-count${!countsReady ? ' loading' : ''}`}>
+                {countsReady ? customerCounts.active : ''}
+              </span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={archivedOnly}
+              className={`pipeline-tab${archivedOnly ? ' active' : ''}`}
+              onClick={() => {
+                setArchivedOnly(true)
+                setActiveTab('all')
+              }}
+            >
+              Archived
+              <span className={`pipeline-tab-count${!countsReady ? ' loading' : ''}`}>
+                {countsReady ? customerCounts.archived : ''}
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Tabs + Search row */}
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="pipeline-tabs" style={{ flex: 1, minWidth: 'auto' }}>
-          {CUSTOMER_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              className={`pipeline-tab ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
+      <div className="admin-toolbar-row" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        {!archivedOnly && (
+          <div className="pipeline-tabs" style={{ flex: 1, minWidth: 'auto' }}>
+            {CUSTOMER_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`pipeline-tab ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <div style={{ position: 'relative', maxWidth: '320px', width: '100%' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted)' }} />
           <input
@@ -150,8 +216,8 @@ function AdminCustomersPage() {
       {error && <div className="notice error">{error}</div>}
 
       {!loading && !error && (
-        <section className="content-card" style={{ overflowX: 'auto', padding: 0 }}>
-          <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <section className="content-card admin-table-shell" style={{ overflowX: 'auto', padding: 0 }}>
+          <table className="admin-data-table" style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border)' }}>
                 <th style={{ padding: '14px 16px' }}>Customer</th>
@@ -182,7 +248,7 @@ function AdminCustomersPage() {
                       onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Customer" style={{ padding: '14px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div className="review-card-avatar" style={{ width: '32px', height: '32px', fontSize: '12px' }}>
                             {displayName.charAt(0).toUpperCase()}
@@ -193,24 +259,24 @@ function AdminCustomersPage() {
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
+                      <td data-label="Status" style={{ padding: '14px 16px' }}>
                         {isArchived ? (
                           <span className="status-pill status-archived">Archived</span>
                         ) : (
                           <span className="status-pill status-delivered">Active Customer</span>
                         )}
                       </td>
-                      <td style={{ padding: '14px 16px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
+                      <td data-label="Joined" style={{ padding: '14px 16px', color: 'var(--color-text-muted)', fontSize: '13px' }}>
                         {new Date(customer.created_at).toLocaleDateString()}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600 }}>
+                      <td data-label="Total Orders" style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 600 }}>
                         {customer.orders_count || 0}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--color-success-text)' }}>
+                      <td data-label="Total Value" style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: 'var(--color-success-text)' }}>
                         {formatMoney(customer.orders_sum_total || 0)}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <td data-label="Actions" style={{ padding: '14px 16px', textAlign: 'right' }}>
+                        <div className="admin-table-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                           <button
                             type="button"
                             className="button button-secondary"
@@ -223,10 +289,10 @@ function AdminCustomersPage() {
                           <button
                             type="button"
                             className="button button-secondary"
-                            style={{ padding: '6px', color: isArchived ? 'inherit' : 'var(--color-error)' }}
+                            style={{ padding: '6px', color: isArchived ? 'inherit' : 'var(--color-notice-text)' }}
                             onClick={() => handleArchive(customer.id, isArchived)}
                           >
-                            {isArchived ? <RotateCcw size={15} /> : <Trash2 size={15} />}
+                            {isArchived ? <RotateCcw size={15} /> : <Archive size={15} />}
                           </button>
                           {isArchived && (
                             <button

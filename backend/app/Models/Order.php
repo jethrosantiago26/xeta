@@ -17,10 +17,12 @@ class Order extends Model
         'status',
         'payment_method',
         'subtotal',
+        'discount_total',
         'tax',
         'shipping',
         'total',
         'shipping_address',
+        'promotion_breakdown',
         'paid_at',
     ];
 
@@ -28,10 +30,12 @@ class Order extends Model
     {
         return [
             'subtotal' => 'decimal:2',
+            'discount_total' => 'decimal:2',
             'tax' => 'decimal:2',
             'shipping' => 'decimal:2',
             'total' => 'decimal:2',
             'shipping_address' => 'array',
+            'promotion_breakdown' => 'array',
             'paid_at' => 'datetime',
         ];
     }

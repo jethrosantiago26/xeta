@@ -25,20 +25,64 @@ class SupportTicketController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
+        $allowedStatuses = ['open', 'in_progress', 'waiting_customer', 'resolved', 'closed'];
+
         $query = SupportTicket::with(['user', 'assignedAdmin'])
             ->orderByDesc('created_at');
 
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $rawStatuses = preg_split('/\s*,\s*/', (string) $request->input('status')) ?: [];
+            $statuses = array_values(array_intersect($allowedStatuses, array_filter($rawStatuses)));
+
+            if (!empty($statuses)) {
+                $query->whereIn('status', $statuses);
+            } else {
+                // An explicitly invalid status filter should return no records.
+                $query->whereRaw('1 = 0');
+            }
         }
 
         if ($request->filled('type')) {
             $query->where('type', $request->input('type'));
         }
 
+        if ($request->filled('search')) {
+            $searchTerm = trim((string) $request->input('search'));
+
+            if ($searchTerm !== '') {
+                $like = '%' . $searchTerm . '%';
+
+                $query->where(function ($builder) use ($like) {
+                    $builder
+                        ->where('ticket_number', 'like', $like)
+                        ->orWhere('subject', 'like', $like)
+                        ->orWhere('description', 'like', $like)
+                        ->orWhereHas('user', function ($userQuery) use ($like) {
+                            $userQuery
+                                ->where('name', 'like', $like)
+                                ->orWhere('email', 'like', $like);
+                        });
+                });
+            }
+        }
+
         $tickets = $query->paginate($request->integer('per_page', 20));
 
-        return SupportTicketResource::collection($tickets);
+        $statusCounts = [
+            'active' => SupportTicket::query()
+                ->whereIn('status', ['open', 'in_progress', 'waiting_customer'])
+                ->count(),
+            'waiting' => SupportTicket::query()
+                ->where('status', 'waiting_customer')
+                ->count(),
+            'resolved' => SupportTicket::query()
+                ->whereIn('status', ['resolved', 'closed'])
+                ->count(),
+        ];
+
+        return SupportTicketResource::collection($tickets)->additional([
+            'status_counts' => $statusCounts,
+        ]);
     }
 
     /**
@@ -104,7 +148,13 @@ class SupportTicketController extends Controller
             return null;
         }
 
-        $path = Storage::disk('public')->putFile('support-attachments', $request->file('image'));
+        $diskName = $this->resolveAttachmentDisk();
+        $directory = trim((string) config('support.attachments_directory', 'support-attachments'), '/');
+
+        $path = Storage::disk($diskName)->putFile(
+            $directory !== '' ? $directory : 'support-attachments',
+            $request->file('image'),
+        );
 
         if (!$path) {
             throw ValidationException::withMessages([
@@ -112,6 +162,40 @@ class SupportTicketController extends Controller
             ]);
         }
 
-        return '/storage/' . ltrim(str_replace('\\', '/', $path), '/');
+        return $this->resolveAttachmentUrl($diskName, $path);
+    }
+
+    private function resolveAttachmentDisk(): string
+    {
+        $configured = trim((string) config('support.attachments_disk', 'public'));
+        $diskName = $configured !== '' ? $configured : 'public';
+
+        // The default local disk is private in this project, so map it to the public disk for attachments.
+        if ($diskName === 'local') {
+            $diskName = 'public';
+        }
+
+        if (!is_array(config("filesystems.disks.{$diskName}"))) {
+            return 'public';
+        }
+
+        return $diskName;
+    }
+
+    private function resolveAttachmentUrl(string $diskName, string $path): string
+    {
+        $normalizedPath = ltrim(str_replace('\\', '/', $path), '/');
+
+        if ($diskName === 'public') {
+            return '/storage/' . $normalizedPath;
+        }
+
+        $diskUrl = rtrim((string) config("filesystems.disks.{$diskName}.url", ''), '/');
+
+        if ($diskUrl !== '') {
+            return $diskUrl . '/' . $normalizedPath;
+        }
+
+        return '/storage/' . $normalizedPath;
     }
 }

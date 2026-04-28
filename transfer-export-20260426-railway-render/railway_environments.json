@@ -1,0 +1,13 @@
+﻿{
+  "environments": [
+    {
+      "id": "bc029e91-03bc-4fcf-82f7-0ceb2c1a038a",
+      "name": "production",
+      "isEphemeral": false,
+      "isLinked": true,
+      "restricted": false,
+      "createdAt": "2026-04-05T16:06:15.530+00:00",
+      "updatedAt": "2026-04-05T16:06:20.399+00:00"
+    }
+  ]
+}

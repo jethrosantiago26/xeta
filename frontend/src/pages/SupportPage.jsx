@@ -14,6 +14,7 @@ import {
 import { normalizeOrderItemText, resolveOrderItemImage } from '../lib/orderItemMedia.js'
 
 const REFRESH_INTERVAL_MS = 8000
+const SUPPORT_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 
 const emptyTicketForm = {
   subject: '',
@@ -31,6 +32,39 @@ const ticketTypes = [
   { value: 'account', label: 'Account' },
   { value: 'other', label: 'Other' },
 ]
+
+function extractRequestErrorMessage(requestError, fallbackMessage) {
+  const backendMessage = requestError?.response?.data?.message
+  if (typeof backendMessage === 'string' && backendMessage.trim()) {
+    return backendMessage
+  }
+
+  const validationErrors = requestError?.response?.data?.errors
+  if (validationErrors && typeof validationErrors === 'object') {
+    const firstErrorBucket = Object.values(validationErrors).find((value) => Array.isArray(value) && value.length > 0)
+    if (Array.isArray(firstErrorBucket) && firstErrorBucket[0]) {
+      return firstErrorBucket[0]
+    }
+  }
+
+  return fallbackMessage
+}
+
+function validateImageAttachment(file) {
+  if (!file) {
+    return ''
+  }
+
+  if (!String(file.type || '').startsWith('image/')) {
+    return 'Only image attachments are allowed.'
+  }
+
+  if (Number(file.size) > SUPPORT_IMAGE_MAX_BYTES) {
+    return 'Image must be 5 MB or smaller.'
+  }
+
+  return ''
+}
 
 function formatMessageTime(dateString) {
   const date = new Date(dateString)
@@ -238,7 +272,7 @@ function SupportPage() {
       setSelectedTicket(ticket)
       await refreshTicket(ticket.id)
     } catch (requestError) {
-      setError(requestError?.response?.data?.message || 'Ticket submission failed. Please try again.')
+      setError(extractRequestErrorMessage(requestError, 'Ticket submission failed. Please try again.'))
       setSuccess('')
     } finally {
       setSubmitting(false)
@@ -272,7 +306,7 @@ function SupportPage() {
       await refreshTicket(selectedTicket.id)
       setSuccess('Reply sent.')
     } catch (requestError) {
-      setError(requestError?.response?.data?.message || 'Reply could not be sent.')
+      setError(extractRequestErrorMessage(requestError, 'Reply could not be sent.'))
     } finally {
       setSubmitting(false)
     }
@@ -402,6 +436,17 @@ function SupportPage() {
                 style={{ display: 'none' }}
                 onChange={(event) => {
                   const file = event.target.files?.[0] || null
+                  const validationError = validateImageAttachment(file)
+
+                  if (validationError) {
+                    setError(validationError)
+                    setSuccess('')
+                    setForm((current) => ({ ...current, image: null }))
+                    if (ticketImageRef.current) ticketImageRef.current.value = ''
+                    return
+                  }
+
+                  setError('')
                   setForm((current) => ({ ...current, image: file }))
                 }}
               />
@@ -660,7 +705,21 @@ function SupportPage() {
                   type="file"
                   accept="image/*"
                   style={{ display: 'none' }}
-                  onChange={(event) => setReplyImage(event.target.files?.[0] || null)}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null
+                    const validationError = validateImageAttachment(file)
+
+                    if (validationError) {
+                      setReplyImage(null)
+                      setError(validationError)
+                      setSuccess('')
+                      if (replyImageRef.current) replyImageRef.current.value = ''
+                      return
+                    }
+
+                    setError('')
+                    setReplyImage(file)
+                  }}
                 />
                 <button
                   type="button"

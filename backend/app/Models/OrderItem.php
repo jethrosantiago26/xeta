@@ -12,16 +12,22 @@ class OrderItem extends Model
         'variant_id',
         'product_name',
         'variant_name',
+        'base_unit_price',
         'unit_price',
         'quantity',
         'total',
+        'discount_total',
+        'applied_promotions',
     ];
 
     protected function casts(): array
     {
         return [
+            'base_unit_price' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'total' => 'decimal:2',
+            'discount_total' => 'decimal:2',
+            'applied_promotions' => 'array',
         ];
     }
 

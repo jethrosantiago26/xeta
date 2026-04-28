@@ -189,7 +189,7 @@ function ProductDetailPage() {
 
     setIsEditingReview(false)
     setReviewError('')
-  }, [selectedVariantReview?.id, reviewVariantId])
+  }, [selectedVariantReview, reviewVariantId])
 
   async function handleReviewSubmit(e) {
     e.preventDefault()
@@ -338,7 +338,20 @@ function ProductDetailPage() {
   const image = resolveProductImage(product, { variant: selectedVariant })
   const productName = normalizeDisplayText(product.name) || 'Product'
   const selectedVariantName = normalizeDisplayText(selectedVariant?.name) || 'Standard variant'
-  const price = selectedVariant?.price ?? product.lowest_price ?? 0
+  const price = Number(
+    selectedVariant?.sale_price
+    ?? selectedVariant?.final_price
+    ?? selectedVariant?.price
+    ?? product.lowest_sale_price
+    ?? product.lowest_price
+    ?? 0,
+  )
+  const baselinePrice = Number(selectedVariant?.price ?? product.lowest_original_price ?? product.lowest_price ?? price)
+  const compareAtPrice = Number(selectedVariant?.compare_at_price ?? 0)
+  const originalPrice = compareAtPrice > baselinePrice ? compareAtPrice : baselinePrice
+  const hasSalePricing = originalPrice > price && price > 0
+  const computedSalePercent = hasSalePricing ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0
+  const saleLabel = selectedVariant?.sale_label || product.sale?.label || (computedSalePercent > 0 ? `${computedSalePercent}% OFF` : null)
 
   return (
     <div className="page-grid">
@@ -353,6 +366,8 @@ function ProductDetailPage() {
           <p className="lede">{product.description}</p>
           <div className="row">
             <span className="price">{formatMoney(price)}</span>
+            {hasSalePricing ? <span className="muted" style={{ textDecoration: 'line-through' }}>{formatMoney(originalPrice)}</span> : null}
+            {saleLabel ? <span className="status-pill success">{saleLabel}</span> : null}
             {totalRatings > 0 ? (
               <span className="status-pill">{averageRating.toFixed(1)} / 5</span>
             ) : null}
@@ -374,7 +389,7 @@ function ProductDetailPage() {
                     type="button"
                     role="radio"
                     aria-checked={isActive}
-                    aria-label={`${variantName} ${formatMoney(variant.price)}`}
+                    aria-label={`${variantName} ${formatMoney(variant.sale_price ?? variant.final_price ?? variant.price)}`}
                     className={`variant-meatball${isActive ? ' active' : ''}`}
                     style={{
                       '--variant-color': variant.visual.color,
@@ -389,7 +404,7 @@ function ProductDetailPage() {
             {selectedVariant ? (
               <div className="variant-selection-summary">
                 <span>{selectedVariantName}</span>
-                <span>{formatMoney(selectedVariant.price)}</span>
+                <span>{formatMoney(price)}</span>
               </div>
             ) : null}
           </div>

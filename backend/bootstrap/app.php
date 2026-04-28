@@ -20,8 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureAdmin::class,
         ]);
 
-        // Handle _method override for FormData file uploads
-        $middleware->web(append: [
+        // Handle _method override for FormData file uploads (must be on API stack, not web)
+        $middleware->api(append: [
             MethodOverride::class,
         ]);
 

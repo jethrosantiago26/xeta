@@ -17,7 +17,7 @@ class MethodOverride
     {
         if ($request->isMethod('post')) {
             $method = $request->input('_method') ?? $request->header('X-HTTP-METHOD-OVERRIDE');
-            
+
             if ($method && in_array(strtoupper($method), ['PUT', 'PATCH', 'DELETE'])) {
                 $request->setMethod(strtoupper($method));
             }

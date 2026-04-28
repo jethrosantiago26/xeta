@@ -17,6 +17,20 @@ function formatSpecLabel(key) {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+function resolvePreferredVariantId(variants, preferredVariantId = '') {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return ''
+  }
+
+  if (preferredVariantId && variants.some((variant) => String(variant.id) === String(preferredVariantId))) {
+    return String(preferredVariantId)
+  }
+
+  const firstInStockVariant = variants.find((variant) => Number(variant?.stock_quantity ?? 0) > 0)
+
+  return String(firstInStockVariant?.id ?? variants[0]?.id ?? '')
+}
+
 function ProductDetailPage() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -59,7 +73,7 @@ function ProductDetailPage() {
         if (active) {
           setProduct(productData)
           setReviews(productData.reviews ?? [])
-          setSelectedVariantId(String(productData?.variants?.[0]?.id ?? ''))
+          setSelectedVariantId(resolvePreferredVariantId(productData?.variants ?? []))
         }
       } catch {
         if (active) {
@@ -255,6 +269,10 @@ function ProductDetailPage() {
       ?? visualVariants[0]
       ?? null
   }, [visualVariants, selectedVariantId])
+
+  useEffect(() => {
+    setSelectedVariantId((currentVariantId) => resolvePreferredVariantId(visualVariants, currentVariantId))
+  }, [visualVariants])
 
   const specEntries = useMemo(() => {
     if (!product?.specs || typeof product.specs !== 'object') {

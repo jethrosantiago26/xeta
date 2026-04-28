@@ -11,6 +11,24 @@ function resolveVariantFinalPrice(variant) {
   return Number(variant?.sale_price ?? variant?.final_price ?? variant?.price ?? 0)
 }
 
+function isVariantInStock(variant) {
+  return Number(variant?.stock_quantity ?? 0) > 0
+}
+
+function resolvePreferredVariantId(variants, preferredVariantId = '') {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return ''
+  }
+
+  if (preferredVariantId && variants.some((variant) => String(variant.id) === String(preferredVariantId))) {
+    return String(preferredVariantId)
+  }
+
+  const firstInStockVariant = variants.find((variant) => isVariantInStock(variant))
+
+  return String(firstInStockVariant?.id ?? variants[0]?.id ?? '')
+}
+
 function ProductCard({
   product,
   prioritizeImage = false,
@@ -35,7 +53,7 @@ function ProductCard({
     }))
   }, [product])
 
-  const [selectedVariantId, setSelectedVariantId] = useState(String(visualVariants[0]?.id ?? ''))
+  const [selectedVariantId, setSelectedVariantId] = useState(() => resolvePreferredVariantId(visualVariants))
   const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const [busyAction, setBusyAction] = useState('')
@@ -79,7 +97,8 @@ function ProductCard({
   const hasAverageRating = Number.isFinite(averageRatingValue) && averageRatingValue > 0
   const averageRatingLabel = hasAverageRating ? averageRatingValue.toFixed(1) : '0.0'
   const hasMultipleVariants = visualVariants.length > 1
-  const isSoldOut = !selectedVariant || selectedVariant.stock_quantity <= 0
+  const isProductSoldOut = visualVariants.length > 0 && visualVariants.every((variant) => !isVariantInStock(variant))
+  const isSoldOut = !selectedVariant || !isVariantInStock(selectedVariant)
   const priceLabel = selectedVariant
     ? formatMoney(price)
     : price > 0
@@ -89,10 +108,21 @@ function ProductCard({
   const feedbackMessage = actionError || actionMessage
   const inWishlist = isWishlisted(product)
   const wishlistLabel = inWishlist ? 'Remove from wishlist' : 'Save to wishlist'
+  const selectedVariantStockLabel = selectedVariant
+    ? isSoldOut
+      ? `${selectedVariantName} - Out of stock`
+      : `${selectedVariantName} - ${selectedVariant.stock_quantity} in stock`
+    : isProductSoldOut
+      ? 'Out of stock'
+      : 'Choose a variant'
 
   function getVariantNameLabel(variant) {
     return normalizeDisplayText(variant?.name) || 'Variant'
   }
+
+  useEffect(() => {
+    setSelectedVariantId((currentVariantId) => resolvePreferredVariantId(visualVariants, currentVariantId))
+  }, [visualVariants])
 
   useEffect(() => {
     if (!showQuickView) {
@@ -255,6 +285,12 @@ function ProductCard({
 
     event.preventDefault()
     navigate(productPath)
+  }
+
+  function handleVariantSelect(event, variantId) {
+    event.preventDefault()
+    event.stopPropagation()
+    setSelectedVariantId(String(variantId))
   }
 
   const actionSheet = selectedVariant && createPortal(
@@ -499,6 +535,13 @@ function ProductCard({
               decoding="async"
             />
 
+            {isProductSoldOut ? (
+              <>
+                <div className="product-card-media-overlay" aria-hidden="true" />
+                <span className="status-pill product-card-stock-badge">Out of stock</span>
+              </>
+            ) : null}
+
             <div className="product-card-hover-actions" aria-label="Quick product actions">
               <button
                 type="button"
@@ -581,13 +624,17 @@ function ProductCard({
                           '--variant-ring': variant.visual.ringColor,
                           '--variant-ink': variant.visual.textColor,
                         }}
-                        onClick={() => setSelectedVariantId(String(variant.id))}
+                        onClick={(event) => handleVariantSelect(event, variant.id)}
                       />
                     )
                   })}
                 </div>
               </div>
             ) : null}
+
+            <p className={`product-card-selection-copy${isSoldOut ? ' out' : ''}`}>
+              {selectedVariantStockLabel}
+            </p>
 
             <div className="product-card-row-buttons">
               <button
@@ -638,6 +685,13 @@ function ProductCard({
             fetchPriority={imageFetchPriority}
             decoding="async"
           />
+
+          {isProductSoldOut ? (
+            <>
+              <div className="product-card-media-overlay" aria-hidden="true" />
+              <span className="status-pill product-card-stock-badge">Out of stock</span>
+            </>
+          ) : null}
 
           <div className="product-card-hover-actions" aria-label="Quick product actions">
             <button
@@ -718,7 +772,7 @@ function ProductCard({
                         '--variant-ring': variant.visual.ringColor,
                         '--variant-ink': variant.visual.textColor,
                       }}
-                      onClick={() => setSelectedVariantId(String(variant.id))}
+                      onClick={(event) => handleVariantSelect(event, variant.id)}
                     />
                   )
                 })}
@@ -727,6 +781,9 @@ function ProductCard({
               <div className="product-card-variant-placeholder" aria-hidden="true" />
             )}
           </div>
+          <p className={`product-card-selection-copy${isSoldOut ? ' out' : ''}`}>
+            {selectedVariantStockLabel}
+          </p>
           <div className="row product-card-price-row" style={{ justifyContent: 'space-between' }}>
             <div style={{ display: 'grid', gap: '2px' }}>
               <strong className="price">{priceLabel}</strong>

@@ -106,7 +106,7 @@ function ProductsPage() {
       return false
     }
 
-    return window.matchMedia('(max-width: 900px)').matches
+    return window.matchMedia('(max-width: 768px)').matches
   })
 
   const effectiveViewMode = isMobileGridView && (viewMode === 'grid3' || viewMode === 'grid4')
@@ -125,6 +125,7 @@ function ProductsPage() {
       min_price: filters.min_price,
       max_price: filters.max_price,
       in_stock: filters.in_stock,
+      stock_view: filters.stock_view,
       per_page: perPage,
     }
   }, [
@@ -133,6 +134,7 @@ function ProductsPage() {
     filters.min_price,
     filters.max_price,
     filters.in_stock,
+    filters.stock_view,
     perPage,
     selectedCategorySlugs,
   ])
@@ -337,10 +339,15 @@ function ProductsPage() {
 
   function setInStockFilter(checked) {
     const next = new URLSearchParams(searchParams)
+    const outOfStockSelected = searchParams.get('stock_view') === 'out'
 
     if (checked) {
-      next.set('in_stock', '1')
-      next.delete('stock_view')
+      if (outOfStockSelected) {
+        next.delete('in_stock')
+        next.delete('stock_view')
+      } else {
+        next.set('in_stock', '1')
+      }
     } else {
       next.delete('in_stock')
     }
@@ -350,10 +357,15 @@ function ProductsPage() {
 
   function setOutOfStockView(checked) {
     const next = new URLSearchParams(searchParams)
+    const inStockSelected = searchParams.get('in_stock') === '1'
 
     if (checked) {
-      next.set('stock_view', 'out')
-      next.delete('in_stock')
+      if (inStockSelected) {
+        next.delete('in_stock')
+        next.delete('stock_view')
+      } else {
+        next.set('stock_view', 'out')
+      }
     } else {
       next.delete('stock_view')
     }
@@ -364,6 +376,9 @@ function ProductsPage() {
   function toggleCategoryFilter(categorySlug, checked) {
     const next = new URLSearchParams(searchParams)
     const currentCategories = parseCategoryFilters(searchParams)
+    const availableCategorySlugs = categories
+      .map((category) => category.slug)
+      .filter(Boolean)
 
     const nextCategories = checked
       ? Array.from(new Set([...currentCategories, categorySlug]))
@@ -372,7 +387,11 @@ function ProductsPage() {
     // Prefer the multi-value key going forward and clear legacy single key.
     next.delete('category')
 
-    if (nextCategories.length > 0) {
+    const shouldClearCategories = availableCategorySlugs.length > 0
+      && nextCategories.length >= availableCategorySlugs.length
+      && availableCategorySlugs.every((slug) => nextCategories.includes(slug))
+
+    if (nextCategories.length > 0 && !shouldClearCategories) {
       next.set('categories', nextCategories.join(','))
     } else {
       next.delete('categories')
@@ -423,6 +442,16 @@ function ProductsPage() {
   }, [products])
 
   const stockCounts = useMemo(() => {
+    const metaInStock = Number(meta?.stock_counts?.in_stock)
+    const metaOutOfStock = Number(meta?.stock_counts?.out_of_stock)
+
+    if (Number.isFinite(metaInStock) && Number.isFinite(metaOutOfStock)) {
+      return {
+        inStock: metaInStock,
+        outOfStock: metaOutOfStock,
+      }
+    }
+
     let inStock = 0
     let outOfStock = 0
 
@@ -435,15 +464,9 @@ function ProductsPage() {
     }
 
     return { inStock, outOfStock }
-  }, [productsWithStockState])
+  }, [meta?.stock_counts?.in_stock, meta?.stock_counts?.out_of_stock, productsWithStockState])
 
-  const displayedProducts = useMemo(() => {
-    if (filters.stock_view !== 'out') {
-      return productsWithStockState
-    }
-
-    return productsWithStockState.filter((product) => !product.hasStock)
-  }, [productsWithStockState, filters.stock_view])
+  const displayedProducts = productsWithStockState
 
   const selectedPerPage = String(perPage)
   const selectedView = VIEW_OPTIONS.find((option) => option.value === effectiveViewMode) ?? VIEW_OPTIONS[1]
@@ -492,7 +515,7 @@ function ProductsPage() {
       return undefined
     }
 
-    const mediaQuery = window.matchMedia('(max-width: 900px)')
+    const mediaQuery = window.matchMedia('(max-width: 768px)')
 
     function handleViewportChange(event) {
       setIsMobileGridView(event.matches)

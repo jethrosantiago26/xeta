@@ -17,7 +17,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -286,8 +285,7 @@ class ProductController extends Controller
 
     private function invalidateCatalogCaches(): void
     {
-        Cache::forget('categories');
-        $this->productService->bumpProductListCacheVersion();
+        $this->productService->invalidateCatalogCaches();
     }
 
     private function storeProductImage(UploadedFile $image): string

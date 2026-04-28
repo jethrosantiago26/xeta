@@ -1,7 +1,13 @@
 import axios from 'axios'
 
+const configuredApiBaseUrl = String(import.meta.env.VITE_API_URL ?? '').trim()
+
+if (import.meta.env.PROD && configuredApiBaseUrl === '') {
+  throw new Error('Missing VITE_API_URL for production.')
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1',
+  baseURL: configuredApiBaseUrl || 'http://127.0.0.1:8000/api/v1',
   withCredentials: true,
 })
 

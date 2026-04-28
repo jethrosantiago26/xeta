@@ -15,6 +15,7 @@ class OrderService
     public function __construct(
         private readonly CartService $cartService,
         private readonly PromotionEngineService $promotionEngineService,
+        private readonly ProductService $productService,
     ) {}
 
     /**
@@ -93,6 +94,8 @@ class OrderService
                 'order_number' => $order->order_number,
                 'user_id' => $user->id,
             ]);
+
+            $this->productService->invalidateCatalogCaches();
 
             return $order->load(self::ORDER_RELATIONS);
         });

@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProductVariant;
+use App\Services\ProductService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class InventoryController extends Controller
 {
+    public function __construct(
+        private readonly ProductService $productService,
+    ) {}
+
     /**
      * List all product variants with their stock.
      */
@@ -33,6 +38,7 @@ class InventoryController extends Controller
         ]);
 
         $variant->update(['stock_quantity' => $validated['stock_quantity']]);
+        $this->productService->invalidateCatalogCaches();
 
         return response()->json([
             'message' => 'Stock updated successfully',

@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\CategoryResource;
 use App\Http\Resources\ProductResource;
 use App\Services\ProductService;
-use App\Models\ProductVariant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -23,7 +21,7 @@ class ProductController extends Controller
     {
         $filters = $request->only([
             'category', 'categories', 'min_price', 'max_price',
-            'in_stock', 'search', 'sort',
+            'in_stock', 'stock_view', 'search', 'sort',
         ]);
 
         $products = $this->productService->getProducts(
@@ -31,34 +29,13 @@ class ProductController extends Controller
             $request->integer('per_page', 12),
         );
 
-        $boundsQuery = ProductVariant::query()
-            ->active()
-            ->where('condition', 'new')
-            ->whereHas('product', function ($query) use ($filters) {
-                $query->active();
-
-                if (!empty($filters['search'])) {
-                    $query->where('name', 'like', '%' . $filters['search'] . '%');
-                }
-            });
-
-        if (!empty($filters['in_stock'])) {
-            $boundsQuery->inStock();
-        }
-
-        // Intentionally ignore min_price/max_price when computing bounds
-        // so users can widen or reset the slider range.
-        $minPrice = (clone $boundsQuery)->min('price');
-        $maxPrice = (clone $boundsQuery)->max('price');
-
-        $priceBounds = [
-            'min' => $minPrice !== null ? (float) $minPrice : 0,
-            'max' => $maxPrice !== null ? (float) $maxPrice : 0,
-        ];
+        $priceBounds = $this->productService->getPriceBounds($filters);
+        $stockCounts = $this->productService->getStockCounts($filters);
 
         return ProductResource::collection($products)->additional([
             'meta' => [
                 'price_bounds' => $priceBounds,
+                'stock_counts' => $stockCounts,
             ],
         ]);
     }

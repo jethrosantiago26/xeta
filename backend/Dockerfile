@@ -40,7 +40,10 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 # Copy nginx and supervisor configs
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/xeta-entrypoint
+
+RUN chmod +x /usr/local/bin/xeta-entrypoint
 
 EXPOSE 8080
 
-CMD ["sh", "-lc", "php artisan migrate --force && mkdir -p /var/www/html/storage/app/public/products /var/www/html/storage/app/public/product-variants /var/www/html/storage/app/public/support-attachments && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache && chmod -R ug+rwX /var/www/html/storage /var/www/html/bootstrap/cache && /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/usr/local/bin/xeta-entrypoint"]

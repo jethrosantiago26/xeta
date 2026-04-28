@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Product;
+use App\Models\ProductVariant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 
@@ -15,16 +17,7 @@ class ProductService
      */
     public function getProducts(array $filters = [], int $perPage = 12): LengthAwarePaginator
     {
-        $normalizedCategorySlugs = $this->extractCategorySlugs($filters);
-
-        if (!empty($normalizedCategorySlugs)) {
-            sort($normalizedCategorySlugs);
-            $filters['categories'] = $normalizedCategorySlugs;
-        } else {
-            unset($filters['categories']);
-        }
-
-        unset($filters['category']);
+        $filters = $this->normalizeFilters($filters);
 
         $page = request()->query('page', 1);
             $cacheVersion = max(1, (int) Cache::get(self::PRODUCT_LIST_CACHE_VERSION_KEY, 1));
@@ -47,47 +40,8 @@ class ProductService
                     'variants as lowest_price' => fn ($q) => $q->active()->where('condition', 'new'),
                 ], 'price');
 
-            $minPrice = isset($filters['min_price']) && $filters['min_price'] !== ''
-                ? (float) $filters['min_price']
-                : null;
-            $maxPrice = isset($filters['max_price']) && $filters['max_price'] !== ''
-                ? (float) $filters['max_price']
-                : null;
-            $categorySlugs = $this->extractCategorySlugs($filters);
-
-            if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
-                [$minPrice, $maxPrice] = [$maxPrice, $minPrice];
-            }
-
-            // Filter by category
-            if (!empty($categorySlugs)) {
-                $query->whereHas('category', fn ($q) => $q->whereIn('slug', $categorySlugs));
-            }
-
-            // Filter by price range on the same variant to avoid mismatched min/max hits.
-            if ($minPrice !== null || $maxPrice !== null) {
-                $query->whereHas('variants', function ($variantQuery) use ($minPrice, $maxPrice) {
-                    $variantQuery->where('condition', 'new')->active();
-
-                    if ($minPrice !== null) {
-                        $variantQuery->where('price', '>=', $minPrice);
-                    }
-
-                    if ($maxPrice !== null) {
-                        $variantQuery->where('price', '<=', $maxPrice);
-                    }
-                });
-            }
-
-            // Filter by in-stock only
-            if (!empty($filters['in_stock'])) {
-                $query->whereHas('variants', fn ($q) => $q->inStock()->where('condition', 'new')->active());
-            }
-
-            // Search by name
-            if (!empty($filters['search'])) {
-                $query->where('name', 'like', '%' . $filters['search'] . '%');
-            }
+            $this->applyCommonFilters($query, $filters);
+            $this->applyAvailabilityFilter($query, $filters);
 
             // Sorting
             $sortBy = $filters['sort'] ?? 'newest';
@@ -107,6 +61,55 @@ class ProductService
 
             return $query->paginate($perPage);
         });
+    }
+
+    public function getStockCounts(array $filters = []): array
+    {
+        $filters = $this->normalizeFilters($filters);
+        unset($filters['in_stock'], $filters['stock_view']);
+
+        $baseQuery = Product::active();
+        $this->applyCommonFilters($baseQuery, $filters);
+
+        $inStock = (clone $baseQuery)
+            ->whereHas('variants', fn ($q) => $q->inStock()->where('condition', 'new')->active())
+            ->count();
+
+        $outOfStock = (clone $baseQuery)
+            ->whereDoesntHave('variants', fn ($q) => $q->inStock()->where('condition', 'new')->active())
+            ->count();
+
+        return [
+            'in_stock' => $inStock,
+            'out_of_stock' => $outOfStock,
+        ];
+    }
+
+    public function getPriceBounds(array $filters = []): array
+    {
+        $filters = $this->normalizeFilters($filters);
+        unset($filters['min_price'], $filters['max_price']);
+
+        $variantQuery = ProductVariant::query()
+            ->active()
+            ->where('condition', 'new')
+            ->whereHas('product', function (Builder $productQuery) use ($filters) {
+                $productQuery->active();
+                $this->applyCommonFilters($productQuery, $filters);
+                $this->applyAvailabilityFilter($productQuery, $filters);
+            });
+
+        if (!empty($filters['in_stock'])) {
+            $variantQuery->inStock();
+        }
+
+        $minPrice = (clone $variantQuery)->min('price');
+        $maxPrice = (clone $variantQuery)->max('price');
+
+        return [
+            'min' => $minPrice !== null ? (float) $minPrice : 0,
+            'max' => $maxPrice !== null ? (float) $maxPrice : 0,
+        ];
     }
 
     /**
@@ -152,6 +155,83 @@ class ProductService
     {
         $currentVersion = max(1, (int) Cache::get(self::PRODUCT_LIST_CACHE_VERSION_KEY, 1));
         Cache::forever(self::PRODUCT_LIST_CACHE_VERSION_KEY, $currentVersion + 1);
+    }
+
+    public function invalidateCatalogCaches(): void
+    {
+        Cache::forget('categories');
+        $this->bumpProductListCacheVersion();
+    }
+
+    private function normalizeFilters(array $filters): array
+    {
+        $normalizedCategorySlugs = $this->extractCategorySlugs($filters);
+
+        if (!empty($normalizedCategorySlugs)) {
+            sort($normalizedCategorySlugs);
+            $filters['categories'] = $normalizedCategorySlugs;
+        } else {
+            unset($filters['categories']);
+        }
+
+        unset($filters['category']);
+
+        $minPrice = isset($filters['min_price']) && $filters['min_price'] !== ''
+            ? (float) $filters['min_price']
+            : null;
+        $maxPrice = isset($filters['max_price']) && $filters['max_price'] !== ''
+            ? (float) $filters['max_price']
+            : null;
+
+        if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
+            [$minPrice, $maxPrice] = [$maxPrice, $minPrice];
+        }
+
+        $filters['min_price'] = $minPrice;
+        $filters['max_price'] = $maxPrice;
+
+        return $filters;
+    }
+
+    private function applyCommonFilters(Builder $query, array $filters): void
+    {
+        $categorySlugs = $filters['categories'] ?? [];
+        $minPrice = $filters['min_price'] ?? null;
+        $maxPrice = $filters['max_price'] ?? null;
+
+        if (!empty($categorySlugs)) {
+            $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->whereIn('slug', $categorySlugs));
+        }
+
+        if ($minPrice !== null || $maxPrice !== null) {
+            $query->whereHas('variants', function ($variantQuery) use ($minPrice, $maxPrice) {
+                $variantQuery->where('condition', 'new')->active();
+
+                if ($minPrice !== null) {
+                    $variantQuery->where('price', '>=', $minPrice);
+                }
+
+                if ($maxPrice !== null) {
+                    $variantQuery->where('price', '<=', $maxPrice);
+                }
+            });
+        }
+
+        if (!empty($filters['search'])) {
+            $query->where('name', 'like', '%' . $filters['search'] . '%');
+        }
+    }
+
+    private function applyAvailabilityFilter(Builder $query, array $filters): void
+    {
+        if (!empty($filters['in_stock'])) {
+            $query->whereHas('variants', fn ($variantQuery) => $variantQuery->inStock()->where('condition', 'new')->active());
+            return;
+        }
+
+        if (($filters['stock_view'] ?? null) === 'out') {
+            $query->whereDoesntHave('variants', fn ($variantQuery) => $variantQuery->inStock()->where('condition', 'new')->active());
+        }
     }
 
     private function extractCategorySlugs(array $filters): array

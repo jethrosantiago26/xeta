@@ -204,8 +204,8 @@ export async function forceDeleteAdminProduct(productId) {
 
 export async function createAdminProductVariant(productId, payload) {
   if (payload instanceof FormData) {
-    // FormData uploads use POST directly - no method spoofing needed
-    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically for multipart/form-data
+    // FormData uploads use POST - browser automatically sets multipart/form-data
+    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically
     return api.post(`/admin/products/${productId}/variants`, payload, {
       headers: {
         'Content-Type': undefined,
@@ -217,9 +217,10 @@ export async function createAdminProductVariant(productId, payload) {
 
 export async function updateAdminProductVariant(productId, variantId, payload) {
   if (payload instanceof FormData) {
-    // FormData uploads use POST directly (route accepts both PUT and POST)
-    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically for multipart/form-data
-    return api.post(`/admin/products/${productId}/variants/${variantId}`, payload, {
+    // FormData uploads: route accepts both PUT and POST
+    // Use PUT to match REST convention, let axios handle the request properly
+    // CRITICAL: Do NOT set Content-Type header - let browser set it automatically
+    return api.put(`/admin/products/${productId}/variants/${variantId}`, payload, {
       headers: {
         'Content-Type': undefined,
       },

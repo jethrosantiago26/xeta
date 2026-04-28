@@ -224,4 +224,3 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 - Clerk manages authentication in frontend.
 - Laravel verifies Clerk JWT and resolves/creates local users.
 - Admin and customer routes are role-protected.
-- Support emails are delivered via Resend using backend env variables.
